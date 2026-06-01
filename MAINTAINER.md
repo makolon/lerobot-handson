@@ -10,9 +10,10 @@ so that **each time you run the event, in principle you only update `config.env`
 - Keep `env/apptainer.def`'s `From:` / install lines / `%labels` in sync with the same version.
 - Steps to bump the version:
   1. Check argument changes via `lerobot-train` / `lerobot-eval` `--help` for the new tag.
-  2. Verify and update the `# TODO(lerobot)` spots in the `*.sh` files on the real system.
-  3. Update the tag/hash table in `README.md` and the `%labels` in `apptainer.def`.
-  4. Rebuild the image and confirm at minimum that import and `--help` work.
+  2. Re-run `make smoke` against the new version; fix any arg drift in the `*.sh` files.
+  3. Resolve the `# TODO(lerobot)` spots in `env/apptainer.def` (NGC tag / extras / LIBERO).
+  4. Update the tag/hash table in `README.md` and the `%labels` in `apptainer.def`.
+  5. Rebuild the image and confirm at minimum that import and `--help` work.
 
 ## 2. `step-XX-start` tags (rescue for people who fall behind)
 

@@ -30,7 +30,26 @@ qstat
 To evaluate a checkpoint you trained yourself, pass the `pretrained_model` path under
 `OUTPUT_DIR` instead of `config.env`'s `CKPT_REPO` to `eval.sh` (see the in-script comment).
 
-## Expected output (self-check cues)
+## Verify the command without LIBERO
+
+LIBERO needs simulation deps that may be absent off-Miyabi, so `eval.sh` supports
+`DRY_RUN=1` to print the exact command without running it (used by `make smoke`):
+
+```bash
+DRY_RUN=1 POLICY_PATH=.smoke/outputs/smoke_train/checkpoints/last/pretrained_model \
+  OUTPUT_DIR=.smoke/outputs bash 04_eval/eval.sh
+```
+```text
+[eval] lerobot-eval --policy.path=.../pretrained_model --env.type=libero \
+       --env.task=libero_object --eval.n_episodes=10 --eval.batch_size=10 \
+       --output_dir=.smoke/outputs/eval_pretrained_model --policy.device=cpu
+[eval] DRY_RUN=1 -> command construction verified, not executing.
+```
+
+Note `eval.batch_size` must be ≤ `eval.n_episodes` (lerobot raises otherwise); `eval.sh`
+defaults the batch size to the episode count.
+
+## Expected output (self-check cues, real run)
 
 - The log shows per-episode success/failure and a final **success rate** (e.g. `0.6`).
 - Eval videos/rollouts are written under `OUTPUT_DIR` (depending on config).

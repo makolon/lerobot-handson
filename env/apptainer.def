@@ -1,0 +1,66 @@
+# =============================================================================
+# apptainer.def  —  LeRobot container definition for GH200 (aarch64)
+# -----------------------------------------------------------------------------
+# Assumptions:
+#   - Miyabi compute nodes are NVIDIA GH200 (Grace Hopper) = aarch64 arch.
+#     x86-only wheels/instructions will not work.
+#   - The base is an aarch64-capable NGC PyTorch container (multi-arch tag).
+#   - lerobot is pinned to v0.5.1 (keep in sync with the tag/commit in README).
+#
+# See env/build_image.sh for how to build (apptainer build on the login node).
+#
+# TODO(miyabi): confirm available NGC tags / aarch64 dependency resolution on the
+#               real system.
+# =============================================================================
+
+Bootstrap: docker
+# NGC PyTorch container. Assumes a multi-arch image that includes aarch64 (arm64).
+# TODO(lerobot): confirm a tag matching the Python/CUDA required by lerobot v0.5.1
+#                (v0.5.0 moved to Python 3.12 / Transformers v5 line).
+From: nvcr.io/nvidia/pytorch:25.01-py3
+
+%labels
+    Maintainer lerobot-handson
+    LeRobotVersion v0.5.1
+    LeRobotCommit 1396b9fab7aecddd10006c33c47a487ffdcb54b4
+    Arch aarch64
+
+%post
+    set -eux
+
+    # Use the PyTorch shipped with the NGC base image (already built for aarch64).
+    # Do NOT overwrite torch via pip (to avoid pulling x86 wheels).
+    python -m pip install --no-cache-dir --upgrade pip
+
+    # ---- Install LeRobot at the pinned commit ----
+    # The extras are policy/sim dependencies. If an extra cannot build on aarch64,
+    # drop it and record it in the TODO below (do not leave a "looks like it works").
+    # TODO(lerobot): confirm the extras names against the v0.5.1 pyproject
+    #                (e.g. [pi0], [smolvla], [aloha], [libero]).
+    # TODO(lerobot): some sim deps (mujoco/libero) may need a separate aarch64 build.
+    pip install --no-cache-dir \
+        "lerobot[aloha] @ git+https://github.com/huggingface/lerobot.git@v0.5.1"
+
+    # ---- Simulation for evaluation (LIBERO) ----
+    # TODO(lerobot): confirm how to install LIBERO for v0.5.1. Unclear whether it
+    #                comes via a lerobot extra or a separate pip/repo, so left out.
+    # pip install --no-cache-dir libero  # <- name/availability unconfirmed, commented out
+
+    # W&B / HF CLI (used by training and pre-download)
+    pip install --no-cache-dir wandb "huggingface_hub[cli]"
+
+    # Notebook + plotting for 01_dataset/explore.ipynb
+    pip install --no-cache-dir matplotlib jupyterlab
+
+%environment
+    # In-container default. Actual offline control is exported by the PBS script.
+    export PYTHONUNBUFFERED=1
+
+%runscript
+    exec "$@"
+
+%test
+    set -e
+    python -c "import torch; print('torch', torch.__version__)"
+    # Just confirm lerobot imports (no GPU needed)
+    python -c "import lerobot; print('lerobot OK')"

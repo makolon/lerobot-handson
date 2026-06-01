@@ -151,11 +151,14 @@ activemq-data/
 .env
 .envrc
 .venv
-env/
+# NOTE: the project's own `env/` directory (apptainer.def etc.) is source, not a venv.
+# The bare `env/` ignore from the Python template is intentionally removed here, and
+# `!env/` re-includes it (on case-insensitive filesystems `ENV/` would match `env/`).
 venv/
 ENV/
 env.bak/
 venv.bak/
+!env/
 
 # Spyder project settings
 .spyderproject
@@ -227,3 +230,6 @@ wandb/
 *.sif
 *.out
 *.err
+
+# smoke-test scratch output
+.smoke/

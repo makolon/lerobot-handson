@@ -5,10 +5,6 @@ The **single source of truth for the runnable code** of the 105-minute hands-on
 inspect data → convert to LeRobot format → submit a training job → evaluate — on the
 supercomputer **Miyabi (JCAHPC / NVIDIA GH200 Grace Hopper, aarch64)**.
 
-Explanation, pacing, and day-of live information (queue names, billing numbers, etc.)
-live on the Notion side. This repository is referenced from Notion by Step number and
-path. <!-- TODO: Notion top URL -->
-
 ## Pinned LeRobot version
 
 | Item | Value |
@@ -17,9 +13,10 @@ path. <!-- TODO: Notion top URL -->
 | Commit hash | `1396b9fab7aecddd10006c33c47a487ffdcb54b4` |
 | Reference docs | https://huggingface.co/docs/lerobot/index |
 
-> The CLI arguments (`lerobot-train` / `lerobot-eval`, etc.) are based on the official
-> docs and `--help` of this pinned version. Arguments we could not fully confirm are
-> marked with `# TODO(lerobot): confirm against the v0.5.1 docs`.
+> The CLI arguments (`lerobot-train` / `lerobot-eval`, the `LeRobotDataset` API) were
+> verified against an actual `lerobot==0.5.1` install (see the smoke test below). The
+> only remaining unknowns are Miyabi-specific (queue/billing/`module`) and the aarch64
+> container build + GPU; those carry `# TODO(miyabi)` markers and are in the checklist.
 
 ## Quick start
 
@@ -34,19 +31,37 @@ source config.env       # every script assumes these variables are set
 Each script **fails fast with a clear error** if a required environment variable is
 unset. Day-of values are never hard-coded in scripts; they all flow through `config.env`.
 
-## Directory ↔ Notion Step mapping
+## Offline smoke test (no GPU, no network, no Miyabi)
 
-| Directory | Contents | Notion Step |
-|-----------|----------|-------------|
-| `slides/` | Architecture lecture (Marp) | Step 3 |
-| `01_dataset/` | Inspect a dataset and the Hub | Step 4 |
-| `02_convert/` | Convert to LeRobot format | Step 5 |
-| `env/` | Apptainer image / HF pre-download | Step 6 (env setup) |
-| `03_train/` | Training job (main) | Step 7 |
-| `04_eval/` | Evaluation | Step 8 |
-| `challenges/debug/` | Bonus 1: debug a broken job | (advanced) |
-| `challenges/leaderboard/` | Bonus 2: short tuning competition | (advanced) |
-| `cheatsheet/` | qsub/qstat/qdel quick reference | (whole event) |
+The whole exercise path runs on a laptop against synthetic data, so you can sanity-check
+the repo before the event. In an environment with `lerobot==0.5.1` installed:
+
+```bash
+make smoke                       # or: PYTHON=/path/to/venv/bin/python make smoke
+```
+
+It generates a synthetic `LeRobotDataset`, loads it, converts raw episodes, trains ACT
+for a few CPU steps via `03_train/train.sh`, runs the leaderboard tuner, verifies the
+`lerobot-eval` command, and executes `01_dataset/explore.ipynb`. Scratch output goes to
+`.smoke/` (git-ignored). See [`tools/`](./tools/) for the generator and the harness.
+
+> The data/convert/train/tune/notebook code is "bucket 2" — it runs anywhere and
+> carries **no `# TODO`**. Only Miyabi-specific scheduler/site values ("bucket 1") are
+> placeholders.
+
+## Directory layout
+
+| Directory | Contents |
+|-----------|----------|
+| `slides/` | Architecture lecture |
+| `01_dataset/` | Inspect a dataset and the Hub |
+| `02_convert/` | Convert to LeRobot format |
+| `env/` | Apptainer image / HF pre-download |
+| `03_train/` | Training job (main) |
+| `04_eval/` | Evaluation |
+| `challenges/debug/` | Bonus 1: debug a broken job |
+| `challenges/leaderboard/` | Bonus 2: short tuning competition |
+| `cheatsheet/` | qsub/qstat/qdel quick reference |
 
 Operational policy for maintainers (pin tags, `step-XX-start` tags, the `solutions`
 branch) is in [`MAINTAINER.md`](./MAINTAINER.md).
@@ -80,6 +95,6 @@ scripts carry `# TODO(miyabi)` / `# TODO(lerobot)` comments.
 - [ ] **PBS directive syntax** — node/GPU/walltime specification (`-l select=...:ngpus=...`, etc.) is correct for Miyabi
 - [ ] **Apptainer build runs** — `env/apptainer.def` actually builds from the NGC aarch64 base, and `lerobot[extras]` resolves on aarch64
 - [ ] **HF pre-download size** — actual size of the dataset/checkpoint vs. free space in the `HF_HOME` shared area
-- [ ] **`lerobot-train` / `lerobot-eval` arguments** — confirm arg names (`--batch_size` / `--steps` / `--policy.device` / `--wandb.enable`, etc.) via the v0.5.1 `--help`
-- [ ] **LIBERO simulation dependencies** — the extras / env vars needed for evaluation are available on the compute node
+- [ ] **Apptainer build resolves the extras** — `lerobot[aloha]` + matplotlib/jupyter install on aarch64 (CLI args themselves are already verified against 0.5.1 by the smoke test)
+- [ ] **LIBERO simulation dependencies** — the extras / env vars needed for `lerobot-eval` are available on the compute node (the eval *command* is verified; only the LIBERO sim run is not)
 - [ ] **Shared W&B offline behavior** — if the compute node is offline, whether `WANDB_MODE=offline` + a later sync is required

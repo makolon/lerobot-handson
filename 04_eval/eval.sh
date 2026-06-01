@@ -3,40 +3,61 @@
 # eval.sh  —  the lerobot-eval body (runs inside the container)
 # -----------------------------------------------------------------------------
 # Design intent:
-#   By default it evaluates the [distributed checkpoint (CKPT_REPO)] in LIBERO.
-#   That way you can see a success rate and feel a sense of accomplishment even if
-#   your own training doesn't finish in time (no dependency on training completion).
+#   By default it evaluates the [distributed checkpoint (CKPT_REPO)] in LIBERO,
+#   so you get a success rate even if your own training doesn't finish in time.
 #
-# Confirmed minimal example (from the official README):
-#   lerobot-eval --policy.path=lerobot/pi0_libero_finetuned \
-#                --env.type=libero --env.task=libero_object --eval.n_episodes=10
+# Real lerobot-eval invocation (verified with lerobot==0.5.1):
+#   lerobot-eval --policy.path=<repo_or_dir> --env.type=libero \
+#                --env.task=libero_object --eval.n_episodes=10 --eval.batch_size=10
+# Note: eval.batch_size must be <= eval.n_episodes (lerobot raises otherwise).
 #
-# TODO(lerobot): confirm the exact spelling of --env.task options, --eval.batch_size,
-#                --output_dir, --policy.device via `lerobot-eval --help` for v0.5.1.
+# LIBERO needs simulation deps that may not be present on every machine, so set
+#   DRY_RUN=1  to print the exact command without executing it (used by the smoke
+#   test to verify command construction). Set POLICY_DEVICE=cpu to evaluate on CPU.
+#
+# Overridable env vars:
+#   CKPT_REPO / POLICY_PATH   checkpoint to evaluate (repo_id or local dir)
+#   OUTPUT_DIR                output root
+#   EVAL_EPISODES             number of eval episodes      (default 10)
+#   EVAL_BATCH_SIZE           parallel envs                (default = EVAL_EPISODES)
+#   ENV_TASK                  libero task name             (default libero_object)
+#   POLICY_DEVICE             cuda | cpu                   (default cuda)
+#   DRY_RUN                   1 = print the command, don't run
 # =============================================================================
 set -euo pipefail
 
 # --- fail-fast ---
-: "${CKPT_REPO:?CKPT_REPO unset (config.env)}"
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${EVAL_EPISODES:=10}"
-: "${ENV_TASK:=libero_object}"   # TODO(lerobot): adjust to a task matching the distributed ckpt
+: "${EVAL_BATCH_SIZE:=${EVAL_EPISODES}}"
+: "${ENV_TASK:=libero_object}"
+: "${POLICY_DEVICE:=cuda}"
+
+# Checkpoint to evaluate. Default is the distributed repo (CKPT_REPO).
+# To evaluate your own training output, set:
+#   POLICY_PATH="${OUTPUT_DIR}/${JOB_NAME}/checkpoints/last/pretrained_model"
+POLICY_PATH="${POLICY_PATH:-${CKPT_REPO:?set CKPT_REPO or POLICY_PATH}}"
 
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
-# Checkpoint to evaluate. Default is the distributed repo.
-# To evaluate your own training output, replace below with a path under OUTPUT_DIR:
-#   POLICY_PATH="${OUTPUT_DIR}/${JOB_NAME}/checkpoints/last/pretrained_model"
-POLICY_PATH="${CKPT_REPO}"
+ARGS=(
+  --policy.path="${POLICY_PATH}"
+  --env.type=libero
+  --env.task="${ENV_TASK}"
+  --eval.n_episodes="${EVAL_EPISODES}"
+  --eval.batch_size="${EVAL_BATCH_SIZE}"
+  --output_dir="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")"
+  --policy.device="${POLICY_DEVICE}"
+)
 
 echo "[eval] policy=${POLICY_PATH} env=libero task=${ENV_TASK} episodes=${EVAL_EPISODES}"
+echo "[eval] lerobot-eval ${ARGS[*]}"
 
-lerobot-eval \
-  --policy.path="${POLICY_PATH}" \
-  --env.type=libero \
-  --env.task="${ENV_TASK}" \
-  --eval.n_episodes="${EVAL_EPISODES}" \
-  --output_dir="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")" \
-  --policy.device=cuda
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  echo "[eval] DRY_RUN=1 -> command construction verified, not executing."
+  exit 0
+fi
+
+lerobot-eval "${ARGS[@]}"
 
 echo "[eval] done. See the output dir / log for the success rate and videos."

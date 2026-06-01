@@ -38,5 +38,7 @@ is the leaderboard.
 - observation steps: more history → more expressiveness but more compute.
 - image aug: curbs overfitting, but too strong is counterproductive.
 
-> Note: the lerobot-train config keys for the knobs above need confirmation for v0.5.1
-> (see the `TODO(lerobot)` in `run_tuning.sh`).
+> The knob → `lerobot-train` flag mapping (`--policy.chunk_size`, `--policy.n_obs_steps`,
+> `--policy.optimizer_lr`, `--batch_size`, `--dataset.image_transforms.enable`) is
+> implemented in `run_tuning.sh` and verified against lerobot 0.5.1. Note that for ACT
+> `n_action_steps` must be ≤ `chunk_size`, so the tuner ties them together.

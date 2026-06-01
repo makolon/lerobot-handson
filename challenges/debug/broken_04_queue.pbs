@@ -37,4 +37,5 @@ apptainer exec --nv \
     --batch_size="${BATCH_SIZE:-8}" \
     --steps="${TRAIN_STEPS:-2000}" \
     --output_dir="${OUTPUT_DIR}/broken_04" \
+    --policy.push_to_hub=false \
     --policy.device=cuda

@@ -8,29 +8,50 @@ Hub and check observation/action shapes, fps, and camera images with your own ey
 
 ## Prerequisites
 
-- You have edited `config.env` and run `source config.env` (need `DATA_REPO`, `HF_HOME`).
-- You have run `env/predownload_hf.sh` on the login node to pre-download `DATA_REPO`
-  (so it can be read offline via `HF_HUB_OFFLINE=1`).
+- On Miyabi: `source config.env` (need `DATA_REPO`, `HF_HOME`) and pre-download
+  `DATA_REPO` with `env/predownload_hf.sh` so it reads offline via `HF_HUB_OFFLINE=1`.
+- Offline/standalone (laptop): build the synthetic dataset and point the notebook at it:
+  ```bash
+  python tools/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
+  export DATA_REPO=handson/synthetic
+  export LEROBOT_DATASET_ROOT=$PWD/.smoke/synthetic
+  ```
 
 ## What you use
 
-- [`explore.ipynb`](./explore.ipynb) — loads `LeRobotDataset`, checks shapes, visualizes an image.
+- [`explore.ipynb`](./explore.ipynb) — loads `LeRobotDataset`, prints metadata/shapes,
+  takes a `delta_timestamps` window, runs one DataLoader batch, plots a frame and an
+  episode's signals, and ends with three **🔧 Try it** exercises.
 
-The notebook is meant to be opened in Jupyter / VS Code on the login node (or an
-interactive node). No heavy training, so CPU is enough.
+Open it in Jupyter / VS Code (login or interactive node). No GPU needed.
 
 ## Expected output (self-check cues)
 
-Run the notebook top to bottom. You succeed if you can confirm all of the following:
+Run the notebook top to bottom. Against the synthetic dataset you should see, e.g.:
 
-- `dataset.meta.fps` (e.g. 30) plus `dataset.num_episodes`, `dataset.num_frames` are printed.
-- `dataset[0].keys()` includes `action`, `observation.state`, `observation.images.*`.
-- `dataset[0]['action'].shape` is `(action_dim,)`, and `observation.images.*` is a `(C, H, W)` tensor.
-- One camera image is plotted and shows a robot's-eye view.
-- Specifying `delta_timestamps` adds a leading time axis `T` to the same key's shape
-  (e.g. `(T, C, H, W)`).
+```text
+fps          = 10
+num_episodes = 4
+num_frames   = 96
+
+=== features ===
+observation.state               dtype=float32  shape=(6,)
+action                          dtype=float32  shape=(6,)
+observation.images.front        dtype=image    shape=(64, 64, 3)
+
+action shape = (6,)
+state  shape = (6,)
+state shape without window : (6,)
+state shape with    window : (3, 6)   # leading T=3
+batch action shape : (4, 6)
+batch image  shape : (4, 3, 64, 64)
+episode 0 length: 24 frames
+```
+
+With a real Hub dataset the numbers differ (e.g. `fps=30`, larger images), but the
+shape relationships are the same.
 
 If it doesn't work:
 
-- `HF_HUB_OFFLINE`-related errors → check that pre-download (`env/predownload_hf.sh`)
-  is done and that `HF_HOME` points at the same shared area used during pre-download.
+- `HF_HUB_OFFLINE`-related errors → check pre-download (`env/predownload_hf.sh`) is done
+  and `HF_HOME` points at the same shared area used during pre-download.

@@ -2,19 +2,28 @@
 # =============================================================================
 # train.sh  —  the lerobot-train body (runs inside the container)
 # -----------------------------------------------------------------------------
-# Called from: 03_train/train.pbs (via apptainer exec).
-# Can also be tested standalone: inside the container, `bash 03_train/train.sh`.
+# Called from: 03_train/train.pbs (via apptainer exec) on Miyabi.
+# Also exercised directly by tools/smoke_test.sh on CPU (no GPU/net).
 #
-# Fallback design:
-#   The default is "lightweight policy (ACT) + few steps (TRAIN_STEPS)" so it always
-#   "flows" within 105 minutes (loss moves, a checkpoint is produced). For serious
-#   training, increase TRAIN_STEPS / switch to a heavier policy.
+# Real lerobot-train invocation (verified with lerobot==0.5.1). Everything here is
+# bucket-2 (runs anywhere); only train.pbs carries bucket-1 #PBS placeholders.
 #
-# TODO(lerobot): confirm lerobot-train arg names via `lerobot-train --help` for v0.5.1.
-#   Confirmed minimal example (from the official README):
-#     lerobot-train --policy.type=act --dataset.repo_id=lerobot/aloha_mobile_cabinet
-#   The --batch_size / --steps / --output_dir / --policy.device / --wandb.* below are
-#   draccus-derived config keys, but their exact spelling needs confirmation.
+# Fallback design: the default is "lightweight policy (ACT) + few steps" so a run
+# always "flows" within 105 min (loss moves, a checkpoint is written). Increase
+# TRAIN_STEPS or pass a heavier POLICY_TYPE for serious training.
+#
+# Overridable environment variables (config.env supplies the Miyabi defaults):
+#   DATA_REPO        repo_id of the dataset                (required)
+#   DATASET_ROOT     local dataset dir; if set, adds --dataset.root (offline/local)
+#   OUTPUT_DIR       output root                            (required)
+#   POLICY_TYPE      act | diffusion | ...                  (default act)
+#   TRAIN_STEPS      number of train steps                  (default 2000)
+#   BATCH_SIZE       batch size                             (default 8)
+#   POLICY_DEVICE    cuda | cpu                             (default cuda)
+#   JOB_NAME         run/output name                        (default handson_<policy>)
+#   CHUNK_SIZE / N_OBS_STEPS / N_ACTION_STEPS               (optional; added if set)
+#   PRETRAINED_BACKBONE_WEIGHTS  e.g. "null" to skip the ImageNet download (optional)
+#   SAVE_FREQ / LOG_FREQ                                    (optional)
 # =============================================================================
 set -euo pipefail
 
@@ -24,37 +33,53 @@ set -euo pipefail
 : "${POLICY_TYPE:=act}"
 : "${TRAIN_STEPS:=2000}"
 : "${BATCH_SIZE:=8}"
+: "${POLICY_DEVICE:=cuda}"
 : "${JOB_NAME:=handson_${POLICY_TYPE}}"
+: "${SAVE_FREQ:=${TRAIN_STEPS}}"
+: "${LOG_FREQ:=100}"
 
-# W&B (shared). Kept loose so it still works when unset.
-WANDB_ARGS=()
+ARGS=(
+  --policy.type="${POLICY_TYPE}"
+  --dataset.repo_id="${DATA_REPO}"
+  --batch_size="${BATCH_SIZE}"
+  --steps="${TRAIN_STEPS}"
+  --output_dir="${OUTPUT_DIR}/${JOB_NAME}"
+  --job_name="${JOB_NAME}"
+  --policy.device="${POLICY_DEVICE}"
+  --policy.push_to_hub=false      # we share via W&B, not the Hub; avoids needing policy.repo_id
+  --save_checkpoint=true
+  --save_freq="${SAVE_FREQ}"
+  --log_freq="${LOG_FREQ}"
+)
+
+# Local dataset (offline / synthetic). On Miyabi the dataset is resolved from HF_HOME.
+[[ -n "${DATASET_ROOT:-}" ]] && ARGS+=( --dataset.root="${DATASET_ROOT}" )
+
+# Optional policy knobs (only added when set)
+[[ -n "${CHUNK_SIZE:-}" ]]      && ARGS+=( --policy.chunk_size="${CHUNK_SIZE}" )
+[[ -n "${N_OBS_STEPS:-}" ]]     && ARGS+=( --policy.n_obs_steps="${N_OBS_STEPS}" )
+[[ -n "${N_ACTION_STEPS:-}" ]]  && ARGS+=( --policy.n_action_steps="${N_ACTION_STEPS}" )
+# "null" skips the ResNet ImageNet download (used by the offline smoke test)
+[[ -n "${PRETRAINED_BACKBONE_WEIGHTS:-}" ]] && \
+  ARGS+=( --policy.pretrained_backbone_weights="${PRETRAINED_BACKBONE_WEIGHTS}" )
+
+# W&B (shared). Enabled only when a project is configured.
 if [[ -n "${WANDB_PROJECT:-}" && "${WANDB_PROJECT}" != "<"* ]]; then
-  # TODO(lerobot): confirm the wandb flags (--wandb.enable / --wandb.project /
-  #                --wandb.entity) for v0.5.1.
-  WANDB_ARGS+=( "--wandb.enable=true" "--wandb.project=${WANDB_PROJECT}" )
-  [[ -n "${WANDB_ENTITY:-}" && "${WANDB_ENTITY}" != "<"* ]] && \
-    WANDB_ARGS+=( "--wandb.entity=${WANDB_ENTITY}" )
+  ARGS+=( --wandb.enable=true --wandb.project="${WANDB_PROJECT}" )
+  [[ -n "${WANDB_ENTITY:-}" && "${WANDB_ENTITY}" != "<"* ]] && ARGS+=( --wandb.entity="${WANDB_ENTITY}" )
+else
+  ARGS+=( --wandb.enable=false )
 fi
 
-echo "[train] policy=${POLICY_TYPE} dataset=${DATA_REPO} steps=${TRAIN_STEPS} batch=${BATCH_SIZE}"
-echo "[train] output=${OUTPUT_DIR}/${JOB_NAME}"
-
-# Compute nodes are offline. train.pbs already exports this; re-assert for standalone runs.
+# Compute nodes are offline; train.pbs exports this, re-assert for standalone runs.
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
-lerobot-train \
-  --policy.type="${POLICY_TYPE}" \
-  --dataset.repo_id="${DATA_REPO}" \
-  --batch_size="${BATCH_SIZE}" \
-  --steps="${TRAIN_STEPS}" \
-  --output_dir="${OUTPUT_DIR}/${JOB_NAME}" \
-  --job_name="${JOB_NAME}" \
-  --policy.device=cuda \
-  "${WANDB_ARGS[@]}"
+echo "[train] policy=${POLICY_TYPE} dataset=${DATA_REPO} steps=${TRAIN_STEPS} batch=${BATCH_SIZE} device=${POLICY_DEVICE}"
+echo "[train] output=${OUTPUT_DIR}/${JOB_NAME}"
+echo "[train] lerobot-train ${ARGS[*]}"
 
-# --- Fallback option (an alternative way to reliably "flow" in a short time) ---
-# To short fine-tune from an existing distributed checkpoint, start from a pretrained
-# policy instead of --policy.type above:
-#   TODO(lerobot): confirm how to start from a pretrained checkpoint for v0.5.1
-#                  (e.g. --policy.path=${CKPT_REPO}).
+lerobot-train "${ARGS[@]}"
+
+# Alternative (real): short fine-tune from an existing distributed checkpoint by
+# loading it with --policy.path=<repo_id_or_dir> instead of --policy.type=<...>.
 echo "[train] done. checkpoints -> ${OUTPUT_DIR}/${JOB_NAME}"
