@@ -218,10 +218,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 # ===== lerobot-handson =====
-# 当日変わる値（キュー名・課金番号・W&B・HF など）。絶対にコミットしない。
+# Day-of values (queue names, billing number, W&B, HF, etc.). Never commit.
 config.env
 
-# 学習成果物・ログ
+# Training artifacts / logs
 outputs/
 wandb/
 *.sif
