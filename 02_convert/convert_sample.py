@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 # =============================================================================
-# convert_sample.py  —  合成データを LeRobotDataset (v3.0) 形式へ変換する最小例
+# convert_sample.py  —  minimal example: convert synthetic data to LeRobotDataset (v3.0)
 # -----------------------------------------------------------------------------
-# 目的: features/fps/robot_type を定義し、add_frame -> save_episode -> finalize
-#       の一連を体験する。実機データ変換のテンプレートとして使う。
+# Goal: define features/fps/robot_type and experience the sequence
+#       add_frame -> save_episode -> finalize. Use as a template for real-data conversion.
 #
-# 使い方:
-#   python 02_convert/convert_sample.py          # ローカル保存のみ
-#   python 02_convert/convert_sample.py --push   # HF_USER のリポジトリへ push
+# Usage:
+#   python 02_convert/convert_sample.py          # local save only
+#   python 02_convert/convert_sample.py --push   # push to a repo under HF_USER
 #
-# TODO(lerobot): LeRobotDataset.create / add_frame / save_episode / finalize の
-#                正確なシグネチャは v0.5.1 の docs / --help で要確認。
-#                （v3.0 で finalize() が必須化された点は確認済み: PR #1903）
+# TODO(lerobot): confirm the exact signatures of LeRobotDataset.create / add_frame /
+#                save_episode / finalize against the v0.5.1 docs / --help.
+#                (The fact that finalize() became mandatory in v3.0 is confirmed: PR #1903)
 # =============================================================================
 import argparse
 import os
@@ -23,10 +23,10 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 
 def build_features(state_dim: int, action_dim: int, image_hw=(96, 96)):
-    """各キーの dtype / shape / names を定義する。
+    """Define dtype / shape / names for each key.
 
-    - observation.state, action : 低次元の連続値ベクトル（float32）
-    - observation.images.front  : カメラ画像 (H, W, C) uint8 → 内部で動画エンコード
+    - observation.state, action : low-dimensional continuous vectors (float32)
+    - observation.images.front  : camera frames (H, W, C) uint8 -> video-encoded internally
     """
     h, w = image_hw
     return {
@@ -41,7 +41,7 @@ def build_features(state_dim: int, action_dim: int, image_hw=(96, 96)):
             "names": [f"action_{i}" for i in range(action_dim)],
         },
         "observation.images.front": {
-            "dtype": "video",  # 画像列は video としてエンコードされる
+            "dtype": "video",  # image sequences are video-encoded
             "shape": (h, w, 3),
             "names": ["height", "width", "channels"],
         },
@@ -50,7 +50,7 @@ def build_features(state_dim: int, action_dim: int, image_hw=(96, 96)):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--push", action="store_true", help="HF_USER のリポジトリへ push する")
+    parser.add_argument("--push", action="store_true", help="push to a repo under HF_USER")
     parser.add_argument("--episodes", type=int, default=3)
     parser.add_argument("--frames-per-episode", type=int, default=20)
     parser.add_argument("--fps", type=int, default=30)
@@ -58,18 +58,18 @@ def main():
     parser.add_argument("--action-dim", type=int, default=7)
     args = parser.parse_args()
 
-    # --- repo_id の決定（push 時は HF_USER 必須: fail-fast）---
+    # --- decide repo_id (HF_USER required when pushing: fail-fast) ---
     hf_user = os.environ.get("HF_USER", "")
     if args.push:
         if not hf_user or hf_user.startswith("<TODO"):
-            raise SystemExit("ERROR: --push には HF_USER が必要です。`source config.env` してください。")
+            raise SystemExit("ERROR: --push requires HF_USER. Run `source config.env`.")
     repo_id = f"{hf_user or 'local-user'}/handson-convert-sample"
 
     image_hw = (96, 96)
     features = build_features(args.state_dim, args.action_dim, image_hw)
 
-    # --- データセットを新規作成 ---
-    # TODO(lerobot): create() の引数名（fps/features/robot_type/use_videos 等）を要確認。
+    # --- create a new dataset ---
+    # TODO(lerobot): confirm create() arg names (fps/features/robot_type/use_videos, ...).
     dataset = LeRobotDataset.create(
         repo_id=repo_id,
         fps=args.fps,
@@ -93,18 +93,18 @@ def main():
                     rng.integers(0, 256, size=(*image_hw, 3), dtype=np.uint8)
                 ),
             }
-            # TODO(lerobot): add_frame に task 文字列を渡す引数名を要確認
-            #                （v0.5.1 では task をフレーム/エピソード単位で付与する）。
+            # TODO(lerobot): confirm the arg name for passing a task string to add_frame
+            #                (v0.5.1 attaches a task per frame/episode).
             dataset.add_frame(frame, task="pick up the cube")
             total_frames += 1
         dataset.save_episode()
 
-    # --- 必ず finalize（呼ばないと parquet が壊れる）---
+    # --- always finalize (parquet is corrupt if you don't) ---
     dataset.finalize()
-    print(f"[convert] {args.episodes} episodes / {total_frames} frames を書き出しました -> {repo_id}")
+    print(f"[convert] wrote {args.episodes} episodes / {total_frames} frames -> {repo_id}")
 
     if args.push:
-        # ネット必要・ログインノードで実行すること
+        # Needs network; run on the login node
         dataset.push_to_hub()
         print(f"[convert] pushed to https://huggingface.co/datasets/{repo_id}")
 

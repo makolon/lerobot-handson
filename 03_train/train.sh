@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
 # =============================================================================
-# train.sh  —  lerobot-train 本体（コンテナ内で実行される）
+# train.sh  —  the lerobot-train body (runs inside the container)
 # -----------------------------------------------------------------------------
-# 呼び出し元: 03_train/train.pbs（apptainer exec 経由）。
-# 単体テストもできる: コンテナ内で `bash 03_train/train.sh`。
+# Called from: 03_train/train.pbs (via apptainer exec).
+# Can also be tested standalone: inside the container, `bash 03_train/train.sh`.
 #
-# フォールバック設計:
-#   既定は「軽量ポリシー(ACT) + 少ステップ(TRAIN_STEPS)」で、105分内に必ず
-#   "流れる"（loss が動き checkpoint が出る）体験を担保する。本格学習は
-#   TRAIN_STEPS を増やす / より重いポリシーに変える。
+# Fallback design:
+#   The default is "lightweight policy (ACT) + few steps (TRAIN_STEPS)" so it always
+#   "flows" within 105 minutes (loss moves, a checkpoint is produced). For serious
+#   training, increase TRAIN_STEPS / switch to a heavier policy.
 #
-# TODO(lerobot): lerobot-train の引数名は v0.5.1 の `lerobot-train --help` で要確認。
-#   確認できた最小例（公式 README より）:
+# TODO(lerobot): confirm lerobot-train arg names via `lerobot-train --help` for v0.5.1.
+#   Confirmed minimal example (from the official README):
 #     lerobot-train --policy.type=act --dataset.repo_id=lerobot/aloha_mobile_cabinet
-#   下記の --batch_size / --steps / --output_dir / --policy.device / --wandb.* は
-#   draccus 由来の config キーだが、正確な綴りは要確認。
+#   The --batch_size / --steps / --output_dir / --policy.device / --wandb.* below are
+#   draccus-derived config keys, but their exact spelling needs confirmation.
 # =============================================================================
 set -euo pipefail
 
-# --- fail-fast: 必須変数 ---
-: "${DATA_REPO:?DATA_REPO 未設定 (config.env)}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
+# --- fail-fast: required variables ---
+: "${DATA_REPO:?DATA_REPO unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${POLICY_TYPE:=act}"
 : "${TRAIN_STEPS:=2000}"
 : "${BATCH_SIZE:=8}"
 : "${JOB_NAME:=handson_${POLICY_TYPE}}"
 
-# W&B（共有）。未設定でも動くよう緩めにする。
+# W&B (shared). Kept loose so it still works when unset.
 WANDB_ARGS=()
 if [[ -n "${WANDB_PROJECT:-}" && "${WANDB_PROJECT}" != "<"* ]]; then
-  # TODO(lerobot): wandb の有効化フラグ名（--wandb.enable / --wandb.project /
-  #                --wandb.entity）を v0.5.1 で要確認。
+  # TODO(lerobot): confirm the wandb flags (--wandb.enable / --wandb.project /
+  #                --wandb.entity) for v0.5.1.
   WANDB_ARGS+=( "--wandb.enable=true" "--wandb.project=${WANDB_PROJECT}" )
   [[ -n "${WANDB_ENTITY:-}" && "${WANDB_ENTITY}" != "<"* ]] && \
     WANDB_ARGS+=( "--wandb.entity=${WANDB_ENTITY}" )
@@ -39,7 +39,7 @@ fi
 echo "[train] policy=${POLICY_TYPE} dataset=${DATA_REPO} steps=${TRAIN_STEPS} batch=${BATCH_SIZE}"
 echo "[train] output=${OUTPUT_DIR}/${JOB_NAME}"
 
-# 計算ノードはオフライン。train.pbs 側で export 済みだが単体実行向けに再確認。
+# Compute nodes are offline. train.pbs already exports this; re-assert for standalone runs.
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
 lerobot-train \
@@ -52,9 +52,9 @@ lerobot-train \
   --policy.device=cuda \
   "${WANDB_ARGS[@]}"
 
-# --- フォールバック案（短時間で確実に "流す" 別解）---
-# 既存の配布済みチェックポイントから短時間 fine-tune したい場合は、上の
-# --policy.type の代わりに事前学習済みポリシーを起点にする:
-#   TODO(lerobot): pretrained から始める引数（例 --policy.path=${CKPT_REPO}）の
-#                  正確な指定方法を v0.5.1 で要確認。
+# --- Fallback option (an alternative way to reliably "flow" in a short time) ---
+# To short fine-tune from an existing distributed checkpoint, start from a pretrained
+# policy instead of --policy.type above:
+#   TODO(lerobot): confirm how to start from a pretrained checkpoint for v0.5.1
+#                  (e.g. --policy.path=${CKPT_REPO}).
 echo "[train] done. checkpoints -> ${OUTPUT_DIR}/${JOB_NAME}"

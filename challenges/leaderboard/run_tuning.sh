@@ -1,53 +1,55 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run_tuning.sh  —  短時間チューニング対決のランナー（本命2）
+# run_tuning.sh  —  runner for the short tuning competition (Bonus 2)
 # -----------------------------------------------------------------------------
-# 【対話ノード前提】: バッチ投入ではなく、確保済みの対話/デバッグノードで直接実行する。
-#   （例: 対話ノードを確保 → コンテナに入る or apptainer exec → 本スクリプト）
-#   TODO(miyabi): 対話ノードの確保方法（qsub -I 等）は公式マニュアルで要確認。
+# [Assumes an interactive node]: run directly on a reserved interactive/debug node,
+#   not via batch submission. (e.g. reserve an interactive node -> enter the container
+#   or apptainer exec -> run this script)
+#   TODO(miyabi): confirm how to reserve an interactive node (qsub -I, etc.).
 #
-# 公平性のため固定: step 数 / walltime / データセット / ポリシー種別。
-# いじれるノブ（引数 or 環境変数）:
-#   CHUNK_SIZE : action horizon（一度に予測する行動ステップ数）
+# Fixed for fairness: step count / walltime / dataset / policy type.
+# Knobs you can turn (arguments or environment variables):
+#   CHUNK_SIZE : action horizon (number of action steps predicted at once)
 #   LR         : learning rate
-#   BATCH_SIZE : バッチサイズ
-#   OBS_STEPS  : 観測の時間窓（observation steps）
-#   AUG        : 画像augmentation on/off
+#   BATCH_SIZE : batch size
+#   OBS_STEPS  : observation time window (observation steps)
+#   AUG        : image augmentation on/off
 #
-# TODO(lerobot): 各ノブに対応する lerobot-train の config キー名は v0.5.1 の
-#   `lerobot-train --help` で要確認。下の綴りは ACT 系の一般的な名称に基づく推定。
-#     chunk size  -> --policy.chunk_size （+ --policy.n_action_steps 連動の場合あり）
+# TODO(lerobot): confirm the lerobot-train config keys for each knob via
+#   `lerobot-train --help` for v0.5.1. The spellings below are guesses based on the
+#   common names for ACT-family policies:
+#     chunk size  -> --policy.chunk_size (may be linked with --policy.n_action_steps)
 #     obs steps   -> --policy.n_obs_steps
-#     lr          -> --optimizer.lr もしくは --policy.optimizer_lr
-#     aug         -> 画像変換の有効化フラグ（dataset.image_transforms.enable 等）
+#     lr          -> --optimizer.lr or --policy.optimizer_lr
+#     aug         -> the image-transforms enable flag (dataset.image_transforms.enable, etc.)
 # =============================================================================
 set -euo pipefail
 
-# --- 固定値（公平性のため変更しない）---
+# --- fixed values (do not change, for fairness) ---
 FIXED_STEPS="${FIXED_STEPS:-1000}"
 POLICY_TYPE="${POLICY_TYPE:-act}"
 
-# --- fail-fast: 共有 W&B が無いとリーダーボードにならない ---
-: "${DATA_REPO:?DATA_REPO 未設定 (config.env)}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
-: "${WANDB_PROJECT:?WANDB_PROJECT 未設定: 共有W&Bに出さないと順位が見えません}"
+# --- fail-fast: without a shared W&B there is no leaderboard ---
+: "${DATA_REPO:?DATA_REPO unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${WANDB_PROJECT:?WANDB_PROJECT unset: without the shared W&B the ranking is invisible}"
 
-# --- ノブ（既定値つき）---
+# --- knobs (with defaults) ---
 CHUNK_SIZE="${CHUNK_SIZE:-50}"
 LR="${LR:-1e-4}"
 BATCH_SIZE="${BATCH_SIZE:-8}"
 OBS_STEPS="${OBS_STEPS:-1}"
 AUG="${AUG:-off}"
 
-# run 名にノブを埋めて W&B 上で区別しやすくする
+# Embed the knobs in the run name to tell them apart in W&B
 RUN_NAME="lb_${POLICY_TYPE}_cs${CHUNK_SIZE}_lr${LR}_bs${BATCH_SIZE}_obs${OBS_STEPS}_aug${AUG}"
 
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
-# augmentation フラグの組み立て
+# Assemble the augmentation flag
 AUG_ARGS=()
 if [[ "${AUG}" == "on" ]]; then
-  # TODO(lerobot): 画像aug有効化キーを v0.5.1 で要確認
+  # TODO(lerobot): confirm the image-aug enable key for v0.5.1
   AUG_ARGS+=( "--dataset.image_transforms.enable=true" )
 fi
 
@@ -57,8 +59,8 @@ WANDB_ARGS=( "--wandb.enable=true" "--wandb.project=${WANDB_PROJECT}" )
 
 echo "[tuning] ${RUN_NAME}"
 
-# 対話ノードで既にコンテナ内にいるならそのまま lerobot-train を呼ぶ。
-# コンテナ外から回すなら apptainer exec --nv "${APPTAINER_IMAGE}" で本体を包む。
+# If you're already inside the container on the interactive node, call lerobot-train directly.
+# To run from outside the container, wrap the body with apptainer exec --nv "${APPTAINER_IMAGE}".
 lerobot-train \
   --policy.type="${POLICY_TYPE}" \
   --dataset.repo_id="${DATA_REPO}" \
@@ -73,4 +75,4 @@ lerobot-train \
   "${AUG_ARGS[@]}" \
   "${WANDB_ARGS[@]}"
 
-echo "[tuning] done. 共有 W&B (${WANDB_PROJECT}) で ${RUN_NAME} のスコアを確認。"
+echo "[tuning] done. Check the score for ${RUN_NAME} in the shared W&B (${WANDB_PROJECT})."

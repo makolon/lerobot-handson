@@ -1,12 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# このジョブは投入すると失敗する。logを読んで原因を直し、再投入せよ。
-# （答えはこのファイルにもmainブランチにも書かれていない）
+# This job fails when submitted. Read the log, fix the cause, and resubmit.
+# (The answer is written neither in this file nor on the main branch.)
 # =============================================================================
 
 #PBS -N broken_03
 #PBS -j oe
-# TODO(miyabi): キュー/課金/資源は投入時に渡す。例:
+# TODO(miyabi): pass queue/billing/resources at submit time. Example:
 #   qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 \
 #        -l walltime="$WALLTIME" -v ALL challenges/debug/broken_03_bind.pbs
 
@@ -14,17 +14,17 @@ set -euo pipefail
 cd "${PBS_O_WORKDIR:-$(pwd)}"
 [[ -f config.env ]] && source config.env
 
-: "${APPTAINER_IMAGE:?APPTAINER_IMAGE 未設定}"
-: "${DATA_DIR:?DATA_DIR 未設定}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
-: "${HF_HOME:?HF_HOME 未設定}"
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset}"
+: "${DATA_DIR:?DATA_DIR unset}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
 mkdir -p "${OUTPUT_DIR}"
 
 export HF_HUB_OFFLINE=1
 export HF_HOME
 [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]] && module load "${APPTAINER_MODULE}"
 
-# bind するのは出力と HF キャッシュだけ。
+# Only the output and HF cache are bound.
 apptainer exec --nv \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \

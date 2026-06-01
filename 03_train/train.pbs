@@ -1,28 +1,28 @@
 #!/bin/bash
 # =============================================================================
-# train.pbs  —  GH200 計算ノードで lerobot-train を回す PBS ジョブ
+# train.pbs  —  PBS job that runs lerobot-train on a GH200 compute node
 # -----------------------------------------------------------------------------
-# 投入: source config.env && qsub 03_train/train.pbs
+# Submit: source config.env && qsub 03_train/train.pbs
 #
-# 注意: #PBS ディレクティブはシェル変数を展開しない。よって資源値はここに
-#       直書きせず、qsub 時に -v で config.env の値を渡すか、qsub の引数で
-#       上書きする運用にしている（下の「投入例」参照）。当日変わる値を
-#       スクリプトに焼き込まないための措置。
+# Note: #PBS directives do not expand shell variables. So resource values are not
+#       hard-coded here; instead pass config.env values via -v at submit time, or
+#       override them with qsub arguments (see "submit example" below). This keeps
+#       day-of values from being baked into the script.
 #
-# TODO(miyabi): 以下の #PBS 書式（キュー指定 -q / 課金 -P / 資源 -l select）は
-#               JCAHPC/Miyabi 公式マニュアルで要確認。PBS系を仮定しているだけ。
+# TODO(miyabi): confirm the #PBS syntax below (queue -q / billing -P / resources
+#               -l select) against the JCAHPC/Miyabi official manual. We only assume PBS.
 # =============================================================================
 
 #PBS -N lerobot_train
 #PBS -j oe
-# TODO(miyabi): 下記はプレースホルダ。実際のキュー名/課金/資源書式に置き換える。
+# TODO(miyabi): the following are placeholders. Replace with real queue/billing/resource syntax.
 #   -q <QUEUE_NAME>
 #   -P <GROUP>
 #   -l select=1:ngpus=1
 #   -l walltime=01:30:00
 #
-# 推奨運用: 上をハードコードせず、投入時に値を渡す。
-#   投入例:
+# Recommended usage: don't hard-code the above; pass values at submit time.
+#   Submit example:
 #     qsub -q "$QUEUE_NAME" -P "$GROUP" \
 #          -l select=${NUM_NODES}:ngpus=${NUM_GPUS} \
 #          -l walltime=${WALLTIME} \
@@ -31,38 +31,38 @@
 
 set -euo pipefail
 
-# PBS はジョブ投入時の CWD に来ない場合がある。リポジトリルートへ移動。
+# PBS may not start in the submit CWD. Move to the repo root.
 cd "${PBS_O_WORKDIR:-$(pwd)}"
 
-# --- config.env を読み込む（-v ALL で渡らない値の保険）---
+# --- load config.env (fallback for values not passed via -v ALL) ---
 if [[ -f config.env ]]; then
   # shellcheck disable=SC1091
   source config.env
 fi
 
-# --- fail-fast: 必須変数チェック ---
-: "${APPTAINER_IMAGE:?APPTAINER_IMAGE 未設定 (config.env)}"
-: "${DATA_DIR:?DATA_DIR 未設定}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
-: "${HF_HOME:?HF_HOME 未設定}"
+# --- fail-fast: required variables ---
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
+: "${DATA_DIR:?DATA_DIR unset}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
 
 mkdir -p "${OUTPUT_DIR}"
 
-# --- オフライン計算ノード向けの環境変数 ---
-# 計算ノードは外部ネットに出られない前提。HF は事前DL済みキャッシュのみ使う。
+# --- environment for the offline compute node ---
+# Compute nodes have no external network. HF uses only the pre-downloaded cache.
 export HF_HUB_OFFLINE=1
 export HF_HOME
 
-# Apptainer module（必要なら）
-# TODO(miyabi): Apptainer/Singularity の module 名を要確認
+# Apptainer module (if needed)
+# TODO(miyabi): confirm the Apptainer/Singularity module name
 if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
   module load "${APPTAINER_MODULE}"
 fi
 
-# --- コンテナ内で train.sh を実行 ---
-# --nv     : GPU を渡す
-# --bind   : データ・出力・HFキャッシュ領域をコンテナから見えるようにする（重要）
-#            ここを忘れると FileNotFoundError になる（challenges/debug/broken_03 参照）。
+# --- run train.sh inside the container ---
+# --nv     : pass the GPU through
+# --bind   : make data / output / HF cache visible inside the container (important).
+#            Forgetting this causes FileNotFoundError (see challenges/debug/broken_03).
 apptainer exec --nv \
   --bind "${DATA_DIR}:${DATA_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \

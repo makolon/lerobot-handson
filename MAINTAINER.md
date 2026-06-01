@@ -1,64 +1,69 @@
-# MAINTAINER — 運営向け運用ガイド
+# MAINTAINER — operational guide for organizers
 
-このリポジトリは「実行コードの正本」。**毎回の開催で更新するのは原則 `config.env`
-（各参加者が編集）と Notion 側だけ**で済むように設計してある。コード自体は安定運用する。
+This repository is the "single source of truth for the runnable code". It is designed
+so that **each time you run the event, in principle you only update `config.env`
+(each participant edits it) and the Notion side**. The code itself stays stable.
 
-## 1. LeRobot の pin タグ運用
+## 1. LeRobot pin-tag policy
 
-- `README.md` に **タグ名（`v0.5.1`）とコミットハッシュ**を明記している。
-- `env/apptainer.def` の `From:` / インストール行・`%labels` も同じ版に合わせる。
-- バージョンを上げる時の手順:
-  1. 新タグの `lerobot-train` / `lerobot-eval` の `--help` で引数変更を確認。
-  2. `*.sh` 内の `# TODO(lerobot)` 箇所を実機で検証して更新。
-  3. `README.md` のタグ/ハッシュ表、`apptainer.def` の `%labels` を更新。
-  4. イメージを再ビルドし、最低限 import と `--help` が通ることを確認。
+- `README.md` records the **tag name (`v0.5.1`) and commit hash**.
+- Keep `env/apptainer.def`'s `From:` / install lines / `%labels` in sync with the same version.
+- Steps to bump the version:
+  1. Check argument changes via `lerobot-train` / `lerobot-eval` `--help` for the new tag.
+  2. Verify and update the `# TODO(lerobot)` spots in the `*.sh` files on the real system.
+  3. Update the tag/hash table in `README.md` and the `%labels` in `apptainer.def`.
+  4. Rebuild the image and confirm at minimum that import and `--help` work.
 
-## 2. `step-XX-start` タグ（遅れた人の救済）
+## 2. `step-XX-start` tags (rescue for people who fall behind)
 
-各 Step の開始地点に git タグを切れる設計（救済の保険その1）。
+The design supports cutting a git tag at the start of each Step (safety net #1).
 
 ```bash
-# 例: 各 Step の "開始時点" の main にタグを打つ
+# Example: tag the "start" of each Step on main
 git tag step-01-start <commit>
 git tag step-02-start <commit>
-# ... step-08-start まで
+# ... up to step-08-start
 git push origin --tags
 ```
 
-- 遅れた参加者は `git checkout step-05-start` でそこから追いつける。
-- **保険その2**: 各 Step のスクリプトは前 Step の実行結果に依存せず**自己完結**で動く
-  （データもHFから取得、出力先も独立）。タグが無くても追いつける二重構成。
-- Step とディレクトリの対応は `README.md` の対応表を参照。
+- A participant who falls behind can catch up with `git checkout step-05-start`.
+- **Safety net #2**: each Step's scripts are **self-contained** and do not depend on
+  the previous Step's outputs (data is fetched from HF, output dirs are independent).
+  A two-layer design so people can catch up even without the tags.
+- For the Step ↔ directory mapping, see the table in `README.md`.
 
-## 3. `solutions` ブランチ（本命1の答え）
+## 3. `solutions` branch (the answers for Bonus 1)
 
-壊れたジョブ（`challenges/debug/broken_*.pbs`）の **修正版**と解説
-（`challenges/debug/SOLUTIONS.md`）は **`solutions` ブランチにのみ**置く。
-**`main` には答えを混ぜない**。
+The **fixed versions** of the broken jobs (`challenges/debug/broken_*.pbs`) and the
+explanation (`challenges/debug/SOLUTIONS.md`) live **only on the `solutions` branch**.
+**Do not mix answers into `main`.**
 
 ```bash
-# 作成（初回）
+# Create (first time)
 git switch -c solutions
-# challenges/debug/ に修正版 + SOLUTIONS.md を置いてコミット
+# Put the fixed versions + SOLUTIONS.md under challenges/debug/ and commit
 git push -u origin solutions
 
-# 当日: main を配布。詰まった人には solutions ブランチ or Notion トグルを案内。
+# On the day: distribute main. For people who are stuck, point them to the
+# solutions branch or the Notion toggle.
 ```
 
-- `main` の `challenges/debug/README.md` は「答えは Notion トグル or solutions ブランチ」
-  とだけ案内する（解答は書かない）。
-- LeRobot 版を上げた時は `main` の `broken_*.pbs` と `solutions` の修正版を**両方**揃える。
+- `main`'s `challenges/debug/README.md` only points to "the Notion toggle or the
+  solutions branch" (no answers written there).
+- When you bump the LeRobot version, update **both** `main`'s `broken_*.pbs` and the
+  `solutions` fixed versions.
 
-## 4. 毎回の開催でやること（最小）
+## 4. What to do each time you run the event (minimum)
 
-- [ ] Notion の当日情報（キュー名・課金番号・W&B project/entity・データ repo）を更新。
-- [ ] 参加者に `config.env.example` → `config.env` 編集を案内（リポジトリは read-only）。
-- [ ] ログインノードでイメージビルド（`env/build_image.sh`）と HF 事前DL
-      （`env/predownload_hf.sh`）が共有領域で済んでいるか確認。
-- [ ] 必要なら `step-XX-start` タグを今回の HEAD に打ち直す。
+- [ ] Update the day-of info on Notion (queue names, billing number, W&B project/entity, data repo).
+- [ ] Tell participants to copy `config.env.example` → `config.env` and edit it (the repo is read-only).
+- [ ] Confirm the image build (`env/build_image.sh`) and HF pre-download
+      (`env/predownload_hf.sh`) are done in the shared area on the login node.
+- [ ] If needed, re-cut the `step-XX-start` tags at this round's HEAD.
 
-## 5. 検証できていない点（引き継ぎ）
+## 5. Unverified points (handover)
 
-`README.md` 末尾の「実施前チェックリスト」と各スクリプトの `# TODO(miyabi)` /
-`# TODO(lerobot)` を参照。**捏造で TODO を消さない**こと。Miyabi 実機で確認でき次第、
-該当 TODO を実値に置き換え、チェックリストを縮める。
+See the "Pre-event checklist" at the end of `README.md` and the `# TODO(miyabi)` /
+`# TODO(lerobot)` comments in each script. **Do not erase a TODO with a fabricated
+value.** As soon as you can confirm it on the real Miyabi, replace the TODO with the
+real value and shrink the checklist.

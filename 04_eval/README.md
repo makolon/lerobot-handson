@@ -1,25 +1,25 @@
-# 04_eval — 評価（Notion Step 8）
+# 04_eval — Evaluation (Notion Step 8)
 
-## 目的
+## Goal
 
-**配布済みチェックポイント**を LIBERO シミュレーション上で評価し、success rate を出す。
-自分の学習が時間内に終わらなくても、ここで「ロボットがタスクをこなす数字」を見て
-達成感を得られる設計（学習完走に依存しない）。
+Evaluate a **distributed checkpoint** in the LIBERO simulation and produce a success
+rate. The design lets you see "numbers of a robot doing the task" even if your own
+training doesn't finish in time (it does not depend on training completion).
 
-## 前提
+## Prerequisites
 
-- `config.env` を `source` 済み（`CKPT_REPO`, `APPTAINER_IMAGE`, `HF_HOME`, `OUTPUT_DIR` が必要）。
-- `env/predownload_hf.sh` で `CKPT_REPO`（配布済みチェックポイント）を事前DL済み。
-- コンテナに LIBERO 評価依存が入っていること（`env/apptainer.def` の TODO 参照）。
+- `config.env` has been `source`d (need `CKPT_REPO`, `APPTAINER_IMAGE`, `HF_HOME`, `OUTPUT_DIR`).
+- You pre-downloaded `CKPT_REPO` (the distributed checkpoint) with `env/predownload_hf.sh`.
+- The container has the LIBERO eval dependencies (see the TODO in `env/apptainer.def`).
 
-## 構成
+## Layout
 
-| ファイル | 役割 |
-|----------|------|
-| [`eval.pbs`](./eval.pbs) | `#PBS` 資源指定 + `apptainer exec --nv` で `eval.sh` を呼ぶ |
-| [`eval.sh`](./eval.sh) | `lerobot-eval` で配布済み checkpoint を LIBERO 評価 |
+| File | Role |
+|------|------|
+| [`eval.pbs`](./eval.pbs) | `#PBS` resource spec + calls `eval.sh` via `apptainer exec --nv` |
+| [`eval.sh`](./eval.sh) | evaluates the distributed checkpoint in LIBERO via `lerobot-eval` |
 
-## 実行
+## Run
 
 ```bash
 source config.env
@@ -27,16 +27,16 @@ qsub 04_eval/eval.pbs
 qstat
 ```
 
-自分で学習した checkpoint を評価したい場合は、`config.env` の `CKPT_REPO` の代わりに
-`OUTPUT_DIR` 配下の `pretrained_model` パスを `eval.sh` に渡す（スクリプト内コメント参照）。
+To evaluate a checkpoint you trained yourself, pass the `pretrained_model` path under
+`OUTPUT_DIR` instead of `config.env`'s `CKPT_REPO` to `eval.sh` (see the in-script comment).
 
-## 期待される出力（自己診断の手がかり）
+## Expected output (self-check cues)
 
-- ログに各エピソードの成否と、最終的な **success rate**（例 `0.6` 等）が出る。
-- 評価動画/ロールアウトが `OUTPUT_DIR` 配下に出力される（設定による）。
-- 共有 W&B に eval の指標が記録される（学習 run と同じ project）。
+- The log shows per-episode success/failure and a final **success rate** (e.g. `0.6`).
+- Eval videos/rollouts are written under `OUTPUT_DIR` (depending on config).
+- Eval metrics are recorded in the shared W&B (same project as the training run).
 
-うまくいかない時:
+If something goes wrong:
 
-- LIBERO 関連の import/環境エラー → コンテナに sim 依存が入っているか
-  （`env/apptainer.def` の LIBERO TODO）を確認。
+- LIBERO import/environment errors → check that sim dependencies are in the container
+  (the LIBERO TODO in `env/apptainer.def`).

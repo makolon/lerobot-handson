@@ -1,24 +1,24 @@
 #!/bin/bash
 # =============================================================================
-# このジョブは投入すると失敗する。logを読んで原因を直し、再投入せよ。
-# （答えはこのファイルにもmainブランチにも書かれていない）
+# This job fails when submitted. Read the log, fix the cause, and resubmit.
+# (The answer is written neither in this file nor on the main branch.)
 # =============================================================================
 
-# このジョブは（他と違い）#PBS 行に値を直書きしている。投入: qsub challenges/debug/broken_04_queue.pbs
+# Unlike the others, this job hard-codes values in the #PBS lines. Submit: qsub challenges/debug/broken_04_queue.pbs
 #PBS -N broken_04
 #PBS -j oe
 #PBS -q gpu_debug_queue
 #PBS -l walltime=00:01:00
-# TODO(miyabi): 課金/資源は投入時に -P / -l select で渡す想定。
+# TODO(miyabi): billing/resources are meant to be passed at submit time via -P / -l select.
 
 set -euo pipefail
 cd "${PBS_O_WORKDIR:-$(pwd)}"
 [[ -f config.env ]] && source config.env
 
-: "${APPTAINER_IMAGE:?APPTAINER_IMAGE 未設定}"
-: "${DATA_DIR:?DATA_DIR 未設定}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
-: "${HF_HOME:?HF_HOME 未設定}"
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset}"
+: "${DATA_DIR:?DATA_DIR unset}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
 mkdir -p "${OUTPUT_DIR}"
 
 export HF_HUB_OFFLINE=1

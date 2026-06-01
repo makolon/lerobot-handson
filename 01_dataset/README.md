@@ -1,36 +1,36 @@
-# 01_dataset — データセットと Hub の確認（Notion Step 4）
+# 01_dataset — Inspect a dataset and the Hub (Notion Step 4)
 
-## 目的
+## Goal
 
-LeRobot のデータ形式（`LeRobotDataset`, v3.0）に触れ、「ロボットの学習データとは
-何のテンソルの集まりなのか」を体感する。Hub 上のデータセットを読み込み、
-observation/action の shape・fps・カメラ画像を自分の目で確認する。
+Get hands-on with the LeRobot data format (`LeRobotDataset`, v3.0) and feel what
+"robot learning data" actually is — a collection of tensors. Load a dataset from the
+Hub and check observation/action shapes, fps, and camera images with your own eyes.
 
-## 前提
+## Prerequisites
 
-- `config.env` を編集して `source config.env` 済み（`DATA_REPO`, `HF_HOME` が必要）。
-- ログインノードで `env/predownload_hf.sh` を実行し、`DATA_REPO` を事前DL済み
-  （オフラインでも `HF_HUB_OFFLINE=1` で読めるようにするため）。
+- You have edited `config.env` and run `source config.env` (need `DATA_REPO`, `HF_HOME`).
+- You have run `env/predownload_hf.sh` on the login node to pre-download `DATA_REPO`
+  (so it can be read offline via `HF_HUB_OFFLINE=1`).
 
-## 使うもの
+## What you use
 
-- [`explore.ipynb`](./explore.ipynb) — `LeRobotDataset` を読み込み、shape 確認・画像可視化。
+- [`explore.ipynb`](./explore.ipynb) — loads `LeRobotDataset`, checks shapes, visualizes an image.
 
-ノートブックはログインノード（または対話ノード）の Jupyter / VS Code で開く想定。
-重い学習はしないので CPU で十分。
+The notebook is meant to be opened in Jupyter / VS Code on the login node (or an
+interactive node). No heavy training, so CPU is enough.
 
-## 期待される出力（自己診断の手がかり）
+## Expected output (self-check cues)
 
-ノートブックを上から実行して、以下がすべて確認できれば成功:
+Run the notebook top to bottom. You succeed if you can confirm all of the following:
 
-- `dataset.meta.fps`（例: 30 など）と `dataset.num_episodes`, `dataset.num_frames` が表示される。
-- `dataset[0].keys()` に `action`, `observation.state`, `observation.images.*` が含まれる。
-- `dataset[0]['action'].shape` が `(action_dim,)`、`observation.images.*` が `(C, H, W)` のテンソル。
-- カメラ画像が 1 枚プロットされ、ロボット視点の絵が見える。
-- `delta_timestamps` を指定すると同じキーの shape 先頭に時間軸 `T` が増える
-  （例 `(T, C, H, W)`）ことが確認できる。
+- `dataset.meta.fps` (e.g. 30) plus `dataset.num_episodes`, `dataset.num_frames` are printed.
+- `dataset[0].keys()` includes `action`, `observation.state`, `observation.images.*`.
+- `dataset[0]['action'].shape` is `(action_dim,)`, and `observation.images.*` is a `(C, H, W)` tensor.
+- One camera image is plotted and shows a robot's-eye view.
+- Specifying `delta_timestamps` adds a leading time axis `T` to the same key's shape
+  (e.g. `(T, C, H, W)`).
 
-うまくいかない時:
+If it doesn't work:
 
-- `HF_HUB_OFFLINE` 関連エラー → 事前DL（`env/predownload_hf.sh`）が済んでいるか、
-  `HF_HOME` が事前DL時と同じ共有領域を指しているか確認。
+- `HF_HUB_OFFLINE`-related errors → check that pre-download (`env/predownload_hf.sh`)
+  is done and that `HF_HOME` points at the same shared area used during pre-download.

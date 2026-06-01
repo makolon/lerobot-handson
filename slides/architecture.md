@@ -1,60 +1,60 @@
 ---
 marp: true
-title: ロボット学習モデルのアーキテクチャ座学
+title: Architecture lecture for robot-learning models
 paginate: true
 ---
 
-# ロボット学習モデルのアーキテクチャ
+# Architectures of robot-learning models
 
-LeRobot で扱う主要な方策（policy）を俯瞰する
+An overview of the main policies you handle in LeRobot
 
-- Action Chunking の直感
+- Intuition for Action Chunking
 - ACT / Diffusion Policy
-- π0 / π0.5（VLA + flow matching）
-- GR00T N1.5（cross-embodiment）
-- SmolVLA（小型 VLA）
+- π0 / π0.5 (VLA + flow matching)
+- GR00T N1.5 (cross-embodiment)
+- SmolVLA (small VLA)
 
-> 図は骨子（ASCII / 箇条書き）。当日は口頭で補足。
-
----
-
-# まず：模倣学習の枠組み
-
-観測 → 行動 を学習する。
-
-```
-   観測 o_t                       行動 a_t
- ┌─────────────┐   policy π     ┌──────────┐
- │ camera 画像 │ ───────────▶  │ 関節指令 │
- │ 関節状態    │                │ (7dofなど)│
- └─────────────┘                └──────────┘
-```
-
-- 教師データ = 人間のデモ（observation/action の時系列）
-- 課題: 1 ステップずつ予測すると誤差が累積（compounding error）
+> Figures are skeletons (ASCII / bullet points). Fill in verbally on the day.
 
 ---
 
-# Action Chunking の直感
+# First: the imitation-learning frame
 
-1 ステップではなく **「これからの H ステップ分の行動」をまとめて予測**する。
+Learn observation → action.
+
+```
+   obs o_t                        action a_t
+ ┌─────────────┐   policy π     ┌──────────────┐
+ │ camera image│ ───────────▶  │ joint command│
+ │ joint state │                │ (e.g. 7-dof) │
+ └─────────────┘                └──────────────┘
+```
+
+- Training data = human demonstrations (observation/action time series)
+- Issue: predicting one step at a time accumulates error (compounding error)
+
+---
+
+# Intuition for Action Chunking
+
+Instead of one step, **predict "the next H steps of actions" all at once**.
 
 ```
  t        t+1   t+2   ...   t+H
  │ observe
- └─▶ predict [a_t, a_t+1, ..., a_t+H]   ← chunk (action horizon)
+ └─▶ predict [a_t, a_t+1, ..., a_t+H]   <- chunk (action horizon)
 ```
 
-- 利点: 高頻度の再決定を減らし、滑らかで誤差累積に強い挙動
-- ノブ: **chunk size = action horizon**（大きいほど滑らか／学習は難化）
+- Benefit: fewer high-frequency re-decisions; smoother behavior, robust to error accumulation
+- Knob: **chunk size = action horizon** (larger = smoother / harder to train)
 
 ---
 
 # ACT (Action Chunking Transformer)
 
-- Transformer + CVAE で **行動チャンク**を予測
-- 入力: 複数カメラ画像 + 関節状態、出力: 次の H ステップの行動列
-- 比較的**軽量で学習が速い** → 本ハンズオンの既定ポリシー
+- Predicts an **action chunk** with a Transformer + CVAE
+- Input: multi-camera images + joint state; output: the next H steps of actions
+- Relatively **lightweight and fast to train** → the default policy for this hands-on
 
 ```
  [imgs, state] ─▶ Encoder(Transformer) ─▶ z ─▶ Decoder ─▶ [a_t ... a_t+H]
@@ -65,69 +65,69 @@ LeRobot で扱う主要な方策（policy）を俯瞰する
 
 # Diffusion Policy
 
-- 行動を **拡散モデル（denoising）** で生成
-- ノイズから出発し、観測を条件に行動列へと徐々にデノイズ
+- Generates actions with a **diffusion model (denoising)**
+- Starts from noise and gradually denoises into an action sequence, conditioned on the observation
 
 ```
  noise ──denoise×K──▶ action chunk
             ▲
-      条件: 観測 o_t
+      condition: obs o_t
 ```
 
-- 多峰性（複数の正解挙動）を表現しやすい
-- 推論は反復的（K ステップ）でやや重い
+- Good at representing multimodality (multiple valid behaviors)
+- Inference is iterative (K steps) and somewhat heavy
 
 ---
 
-# π0 / π0.5（VLA + flow matching）
+# π0 / π0.5 (VLA + flow matching)
 
-- **VLA = Vision-Language-Action**：VLM の上に行動生成を載せる
-- 言語指示 + 画像 → 行動。**flow matching** で連続行動を生成
-- π0.5 は汎化・オープンワールド指向の強化版
+- **VLA = Vision-Language-Action**: action generation on top of a VLM
+- Language instruction + image → action. Generates continuous actions via **flow matching**
+- π0.5 is an enhanced version oriented toward generalization / open-world
 
 ```
- [画像 + "put the cup on the plate"]
+ [image + "put the cup on the plate"]
         │  VLM backbone
         ▼
-   flow matching head ─▶ 連続行動チャンク
+   flow matching head ─▶ continuous action chunk
 ```
 
-- 表現力が高い反面**重い** → 本ハンズオンでは既定にしない
+- Highly expressive but **heavy** → not the default for this hands-on
 
 ---
 
-# GR00T N1.5（cross-embodiment）
+# GR00T N1.5 (cross-embodiment)
 
-- NVIDIA の humanoid 向け基盤モデル
-- **cross-embodiment**：異なるロボット形態をまたいで学習・転移
-- 大規模データ + シミュレーションで広い汎化を狙う
+- NVIDIA's foundation model for humanoids
+- **cross-embodiment**: learn/transfer across different robot morphologies
+- Aims for broad generalization with large-scale data + simulation
 
 ```
- 多様な embodiment(腕/ハンド/humanoid) ─┐
- 多様なタスク・データ                  ├─▶ 共有 policy backbone
- sim + real                            ─┘
+ diverse embodiments (arm/hand/humanoid) ─┐
+ diverse tasks & data                     ├─▶ shared policy backbone
+ sim + real                               ─┘
 ```
 
 ---
 
-# SmolVLA（小型 VLA）
+# SmolVLA (small VLA)
 
-- LeRobot コミュニティ発の**小型・実用志向 VLA**
-- 大型 VLA の設計を引き継ぎつつ、**現実的な計算資源**で動かす
-- 教育・エッジ・少データ fine-tune に向く
+- A **small, practical VLA** from the LeRobot community
+- Keeps the design of large VLAs while running on **realistic compute budgets**
+- Suits education / edge / small-data fine-tuning
 
-> 「VLA を体験したいが π0 はまだ重い」層の橋渡し的存在。
+> A bridge for "I want to try a VLA, but π0 is still too heavy."
 
 ---
 
-# まとめ：使い分けの軸
+# Summary: axes for choosing
 
-| policy | 重さ | 特徴 |
-|--------|------|------|
-| ACT | 軽 | 行動チャンク + Transformer/CVAE。速い |
-| Diffusion Policy | 中 | 多峰性に強い。推論反復 |
-| SmolVLA | 中 | 小型 VLA。言語条件 |
-| π0 / π0.5 | 重 | VLA + flow matching。高表現力 |
-| GR00T N1.5 | 重 | cross-embodiment 基盤 |
+| policy | weight | characteristics |
+|--------|--------|-----------------|
+| ACT | light | action chunk + Transformer/CVAE. fast |
+| Diffusion Policy | medium | strong at multimodality. iterative inference |
+| SmolVLA | medium | small VLA. language-conditioned |
+| π0 / π0.5 | heavy | VLA + flow matching. highly expressive |
+| GR00T N1.5 | heavy | cross-embodiment foundation |
 
-本ハンズオンの既定は **ACT**（105 分で「流れる」体験を優先）。
+The default for this hands-on is **ACT** (prioritizing a "it flows" experience in 105 min).

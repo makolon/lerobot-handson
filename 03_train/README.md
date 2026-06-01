@@ -1,44 +1,45 @@
-# 03_train — 学習ジョブの投入（メイン / Notion Step 7）
+# 03_train — Submit a training job (main / Notion Step 7)
 
-## 目的
+## Goal
 
-LeRobot のポリシー（既定: ACT。軽量なため）を、Miyabi の GH200 計算ノード上で
-PBS ジョブとして学習する。「データ → 学習 → checkpoint」が回る一巡を体験する。
+Train a LeRobot policy (default: ACT, because it is lightweight) as a PBS job on a
+Miyabi GH200 compute node. Experience the full loop of "data → training → checkpoint".
 
-VLA（π0 / SmolVLA 等）は重く 105 分に収まりにくいので、**既定は軽量ポリシー +
-少ステップ**にしている。「完走して checkpoint が出る」体験を最優先する設計。
+VLAs (π0 / SmolVLA, etc.) are heavy and hard to fit in 105 minutes, so the **default
+is a lightweight policy + few steps**. The design prioritizes the experience of
+"it completes and a checkpoint is produced".
 
-## 前提
+## Prerequisites
 
-- `config.env` を `source` 済み（`QUEUE_NAME`, `GROUP`, `APPTAINER_IMAGE`, `DATA_REPO`,
-  `HF_HOME`, `OUTPUT_DIR`, `WANDB_*` などが必要）。
-- `env/build_image.sh` でイメージをビルド済み。
-- `env/predownload_hf.sh` で `DATA_REPO` を共有 `HF_HOME` に事前DL済み
-  （計算ノードはオフラインのため）。
+- `config.env` has been `source`d (need `QUEUE_NAME`, `GROUP`, `APPTAINER_IMAGE`,
+  `DATA_REPO`, `HF_HOME`, `OUTPUT_DIR`, `WANDB_*`, etc.).
+- You built the image with `env/build_image.sh`.
+- You pre-downloaded `DATA_REPO` into the shared `HF_HOME` with `env/predownload_hf.sh`
+  (because compute nodes are offline).
 
-## 構成（正本はスクリプト）
+## Layout (the script is the source of truth)
 
-| ファイル | 役割 |
-|----------|------|
-| [`train.pbs`](./train.pbs) | `#PBS` 資源指定 + `apptainer exec --nv` で `train.sh` を呼ぶラッパ |
-| [`train.sh`](./train.sh) | `lerobot-train` 本体。引数は `config.env` 由来の変数で組む |
+| File | Role |
+|------|------|
+| [`train.pbs`](./train.pbs) | `#PBS` resource spec + wrapper that calls `train.sh` via `apptainer exec --nv` |
+| [`train.sh`](./train.sh) | the `lerobot-train` body; arguments are assembled from `config.env` variables |
 
-## 実行
+## Run
 
 ```bash
 source config.env
-qsub 03_train/train.pbs        # ジョブ投入
-qstat                          # 状態確認（cheatsheet/ 参照）
+qsub 03_train/train.pbs        # submit the job
+qstat                          # check status (see cheatsheet/)
 ```
 
-ログは PBS の標準出力/エラー（`*.out` / `*.err`）に出る。
+Logs go to the PBS stdout/stderr (`*.out` / `*.err`).
 
-## 期待される出力（自己診断の手がかり）
+## Expected output (self-check cues)
 
-- `qstat` でジョブが `Q`（待ち）→ `R`（実行）→ 完了、と遷移する。
-- ログに `lerobot-train` の起動行と、step が進むごとの loss が出る。
-- 共有 W&B（`WANDB_PROJECT`/`WANDB_ENTITY`）に run が現れ、loss 曲線が描かれる。
-- `OUTPUT_DIR` 配下に checkpoint（`pretrained_model` 等）が生成される。
+- `qstat` shows the job moving `Q` (queued) → `R` (running) → done.
+- The log shows the `lerobot-train` startup line and the loss as steps progress.
+- A run appears in the shared W&B (`WANDB_PROJECT`/`WANDB_ENTITY`) with a loss curve.
+- A checkpoint (e.g. `pretrained_model`) is generated under `OUTPUT_DIR`.
 
-うまくいかない時は `challenges/debug/` の典型 4 パターン（OOM / オフライン /
-bind 漏れ / キュー名誤り）を思い出す。
+If something goes wrong, recall the four typical patterns in `challenges/debug/`
+(OOM / offline / missing bind / wrong queue name).

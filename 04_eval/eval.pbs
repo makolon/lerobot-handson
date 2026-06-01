@@ -1,16 +1,16 @@
 #!/bin/bash
 # =============================================================================
-# eval.pbs  —  GH200 計算ノードで lerobot-eval を回す PBS ジョブ
+# eval.pbs  —  PBS job that runs lerobot-eval on a GH200 compute node
 # -----------------------------------------------------------------------------
-# 投入: source config.env && qsub 04_eval/eval.pbs
+# Submit: source config.env && qsub 04_eval/eval.pbs
 #
-# TODO(miyabi): #PBS の書式（-q / -P / -l select）は公式マニュアルで要確認。
-#               train.pbs と同様、資源値は投入時に -v / qsub 引数で渡す運用。
+# TODO(miyabi): confirm the #PBS syntax (-q / -P / -l select) against the official
+#               manual. As with train.pbs, pass resource values at submit time via -v / qsub args.
 # =============================================================================
 
 #PBS -N lerobot_eval
 #PBS -j oe
-# TODO(miyabi): プレースホルダ。投入例は 03_train/train.pbs と同じ要領:
+# TODO(miyabi): placeholders. Submit example is the same as 03_train/train.pbs:
 #   qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 \
 #        -l walltime="$WALLTIME" -v ALL 04_eval/eval.pbs
 
@@ -23,13 +23,13 @@ if [[ -f config.env ]]; then
 fi
 
 # --- fail-fast ---
-: "${APPTAINER_IMAGE:?APPTAINER_IMAGE 未設定 (config.env)}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
-: "${HF_HOME:?HF_HOME 未設定}"
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
 
 mkdir -p "${OUTPUT_DIR}"
 
-# オフライン計算ノード向け
+# Environment for the offline compute node
 export HF_HUB_OFFLINE=1
 export HF_HOME
 

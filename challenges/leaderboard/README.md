@@ -1,36 +1,38 @@
-# challenges/leaderboard — 短時間チューニング対決（本命2）
+# challenges/leaderboard — Short tuning competition (Bonus 2)
 
-## これは何か
+## What this is
 
-固定の小データ・固定 step 数・固定 walltime の中で、**ノブ（ハイパラ）を調整して
-できるだけ良いスコアを出す**ミニ競技です。共有 W&B 上に全員の run が並ぶので、
-そこが実質のリーダーボードになります。
+A mini-competition where, within a fixed small dataset, fixed step count, and fixed
+walltime, you **tune the knobs (hyperparameters) to get the best score you can**. Since
+everyone's runs line up in the shared W&B, that effectively becomes the leaderboard.
 
-**対話ノード前提**（バッチ投入ではなく、確保した対話/デバッグノードで直接回す想定）。
-短いイテレーションで「回して→W&Bを見て→ノブを変える」をくり返します。
+**Assumes an interactive node** (you run it directly on a reserved interactive/debug
+node rather than via batch submission). You iterate quickly: "run → look at W&B →
+change a knob".
 
-## いじれるノブ
+## Knobs you can turn
 
-`run_tuning.sh` に引数 or 環境変数で渡します（詳細はスクリプト冒頭コメント）:
+Pass them to `run_tuning.sh` via arguments or environment variables (see the script's
+header comment):
 
-| ノブ | 変数 | 意味 |
-|------|------|------|
-| chunk size (action horizon) | `CHUNK_SIZE` | 一度に予測する行動ステップ数 |
-| learning rate | `LR` | 学習率 |
-| batch size | `BATCH_SIZE` | バッチサイズ |
-| observation steps | `OBS_STEPS` | 観測の時間窓 |
-| 画像 augmentation | `AUG` | `on` / `off` |
+| Knob | Variable | Meaning |
+|------|----------|---------|
+| chunk size (action horizon) | `CHUNK_SIZE` | number of action steps predicted at once |
+| learning rate | `LR` | learning rate |
+| batch size | `BATCH_SIZE` | batch size |
+| observation steps | `OBS_STEPS` | observation time window |
+| image augmentation | `AUG` | `on` / `off` |
 
-固定されるもの（公平性のため変えない）: step 数・walltime・データセット・ポリシー種別。
+Fixed (for fairness; do not change): step count, walltime, dataset, policy type.
 
-## 実行
+## Run
 
 ```bash
 source config.env
-# 例: chunk size と lr を変えて回す
+# Example: run with a different chunk size and lr
 CHUNK_SIZE=50 LR=1e-4 AUG=on bash challenges/leaderboard/run_tuning.sh
 ```
 
-## スコアの見方
+## Reading the score
 
-[`SCORING.md`](./SCORING.md) を参照（指標と W&B 上の順位の読み方）。
+See [`SCORING.md`](./SCORING.md) (the metrics and how to read the ranking in W&B).

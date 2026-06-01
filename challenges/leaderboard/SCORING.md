@@ -1,40 +1,42 @@
-# SCORING — スコアと順位の見方
+# SCORING — How to read scores and rankings
 
-## 指標
+## Metrics
 
-2 つの指標で見ます。役割が違うので両方を意識してください。
+Look at two metrics. They play different roles, so keep both in mind.
 
-### 1. validation loss（学習中の指標）
-- 学習中に出る検証損失。**低いほど良い**。
-- 速く下がるか・下げ止まりが低いかで「学習の効率」を測る。
-- 短時間勝負なので、まずはここが素直な比較軸になる。
+### 1. validation loss (during-training metric)
+- The validation loss reported during training. **Lower is better.**
+- Use it to gauge "training efficiency" — does it drop fast, does it plateau low?
+- In a short competition, this is the most straightforward axis of comparison.
 
-### 2. eval success rate（評価指標・本命）
-- LIBERO 上でタスクを成功させた割合（`0.0`〜`1.0`）。**高いほど良い**。
-- 「loss が低い ≠ 実際に動く」ことがある。最終的な勝敗はこちらを重視。
-- 評価のやり方は [`../../04_eval/`](../../04_eval/) を参照（同じ checkpoint を評価する）。
+### 2. eval success rate (evaluation metric — the real one)
+- The fraction of tasks succeeded in LIBERO (`0.0`–`1.0`). **Higher is better.**
+- "Low loss ≠ actually works" can happen. Weight this more for the final verdict.
+- For how to evaluate, see [`../../04_eval/`](../../04_eval/) (evaluate the same checkpoint).
 
-> 短時間枠では eval まで回せないこともある。その場合は val loss を一次指標、
-> eval success rate を（回せた人の）決勝指標とする運用が現実的。
+> In a short slot you may not get to run eval. In that case a practical scheme is:
+> val loss as the primary metric, eval success rate as the deciding metric (for those
+> who managed to run it).
 
-## 共有 W&B 上での順位の読み方
+## How to read the ranking in the shared W&B
 
-全員が同じ `WANDB_PROJECT` / `WANDB_ENTITY` に書き込むので、W&B の Workspace が
-そのままリーダーボードになります。
+Since everyone writes to the same `WANDB_PROJECT` / `WANDB_ENTITY`, the W&B Workspace
+is the leaderboard.
 
-1. ブラウザで該当 project を開く（`https://wandb.ai/<entity>/<project>`）。
-2. **Runs テーブル**で、列に `val/loss`（最小）や `eval/success_rate`（最大）を追加。
-3. その列でソートすれば順位が出る。run 名にノブが埋まっている
-   （例 `lb_act_cs50_lr1e-4_bs8_obs1_augon`）ので、どの設定が効いたか一目で分かる。
-4. **Charts** で複数 run の loss 曲線を重ねると、収束の速さ・安定性を比較できる。
+1. Open that project in the browser (`https://wandb.ai/<entity>/<project>`).
+2. In the **Runs table**, add columns for `val/loss` (min) and `eval/success_rate` (max).
+3. Sort by that column to get the ranking. The run names embed the knobs
+   (e.g. `lb_act_cs50_lr1e-4_bs8_obs1_augon`), so you can see at a glance which setting worked.
+4. In **Charts**, overlay loss curves from multiple runs to compare convergence
+   speed and stability.
 
-## ヒント（どのノブが効くか）
+## Hints (which knobs matter)
 
-- chunk size（action horizon）: 大きいと滑らかだが学習は難しくなりがち。
-- learning rate: 大きすぎると発散、小さすぎると短時間で下がりきらない。
-- batch size: 大きいほど安定だが OOM 注意（`challenges/debug/broken_01` 参照）。
-- observation steps: 履歴を増やすと表現力↑だが計算↑。
-- 画像 aug: 過学習を抑えるが、強すぎると逆効果。
+- chunk size (action horizon): larger is smoother but tends to make training harder.
+- learning rate: too large diverges, too small won't drop enough in a short time.
+- batch size: larger is more stable but watch for OOM (see `challenges/debug/broken_01`).
+- observation steps: more history → more expressiveness but more compute.
+- image aug: curbs overfitting, but too strong is counterproductive.
 
-> 注意: 上記ノブ名に対応する `lerobot-train` の config キーは v0.5.1 で要確認
-> （`run_tuning.sh` の `TODO(lerobot)` 参照）。
+> Note: the lerobot-train config keys for the knobs above need confirmation for v0.5.1
+> (see the `TODO(lerobot)` in `run_tuning.sh`).

@@ -1,32 +1,35 @@
-# challenges/debug — 壊れたジョブのデバッグ（本命1）
+# challenges/debug — Debug the broken jobs (Bonus 1)
 
-## これは何か
+## What this is
 
-ここには **意図的に1点だけ壊してある** PBS ジョブが 4 本あります。投入すると失敗します。
-あなたのミッションは「ログを読み、原因を特定し、直して再投入する」こと。
-実運用で必ず出会う 4 つの典型的なつまずきを、安全な場所で踏み抜く練習です。
+Here are 4 PBS jobs, each **intentionally broken in exactly one spot**. Submitting them
+fails. Your mission is to "read the log, identify the cause, fix it, and resubmit."
+It's practice for stepping on the 4 typical stumbling blocks you'll inevitably hit in
+real operation, in a safe place.
 
-| ファイル | 症状のヒント（何が起きるか） |
-|----------|------------------------------|
-| `broken_01_oom.pbs` | 実行は始まるが GPU 関連でクラッシュする |
-| `broken_02_offline.pbs` | 動き出すが、外部に何かを取りに行って固まる/タイムアウトする |
-| `broken_03_bind.pbs` | ファイルが「無い」と言って落ちる |
-| `broken_04_queue.pbs` | そもそも投入が通らない（または途中で打ち切られる） |
+| File | Symptom hint (what happens) |
+|------|-----------------------------|
+| `broken_01_oom.pbs` | execution starts but crashes with something GPU-related |
+| `broken_02_offline.pbs` | it starts moving but goes to fetch something externally and hangs/times out |
+| `broken_03_bind.pbs` | it dies saying a file "doesn't exist" |
+| `broken_04_queue.pbs` | the submission doesn't go through at all (or it's killed partway) |
 
-## 進め方
+## How to proceed
 
-1. `source config.env` 済みであることを確認。
-2. 1 本ずつ `qsub challenges/debug/broken_0X_xxx.pbs` で投入する。
-3. `qstat` で状態を見て、終わったら出力ログ（`*.out` / 標準エラー）を**最後まで読む**。
-4. エラーメッセージから原因を推測し、ファイルを直して再投入する。
-5. 直し方の方針は `03_train/train.pbs` / `train.sh` の「正しい版」と見比べると掴めます。
+1. Confirm you have run `source config.env`.
+2. Submit one at a time with `qsub challenges/debug/broken_0X_xxx.pbs`.
+3. Check status with `qstat`; when it finishes, **read the output log
+   (`*.out` / stderr) to the end**.
+4. Infer the cause from the error message, fix the file, and resubmit.
+5. To get a sense of the fix, compare against the "correct" version in
+   `03_train/train.pbs` / `train.sh`.
 
-## 答えはどこ？
+## Where are the answers?
 
-**`main` ブランチには答えを置いていません。** 解答（各 bug の原因と修正）は:
+**The `main` branch contains no answers.** The solutions (cause and fix for each bug) are in:
 
-- **Notion の解答トグル**、または
-- このリポジトリの **`solutions` ブランチ**（`challenges/debug/` の修正版 +
-  `challenges/debug/SOLUTIONS.md`）
+- the **Notion solution toggle**, or
+- the **`solutions` branch** of this repository (fixed versions of `challenges/debug/`
+  plus `challenges/debug/SOLUTIONS.md`).
 
-にあります。まずは自力で、ログを根拠に直してみてください。
+Try to fix them yourself first, grounded in the logs.

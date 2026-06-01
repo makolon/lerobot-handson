@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
 # =============================================================================
-# eval.sh  —  lerobot-eval 本体（コンテナ内で実行される）
+# eval.sh  —  the lerobot-eval body (runs inside the container)
 # -----------------------------------------------------------------------------
-# 設計意図:
-#   既定では【配布済みチェックポイント(CKPT_REPO)】を LIBERO で評価する。
-#   こうすることで、自分の学習が時間内に終わらなくても success rate を見て
-#   達成感を得られる（学習完走に依存しない）。
+# Design intent:
+#   By default it evaluates the [distributed checkpoint (CKPT_REPO)] in LIBERO.
+#   That way you can see a success rate and feel a sense of accomplishment even if
+#   your own training doesn't finish in time (no dependency on training completion).
 #
-# 確認できた最小例（公式 README より）:
+# Confirmed minimal example (from the official README):
 #   lerobot-eval --policy.path=lerobot/pi0_libero_finetuned \
 #                --env.type=libero --env.task=libero_object --eval.n_episodes=10
 #
-# TODO(lerobot): --env.task の選択肢、--eval.batch_size、--output_dir、
-#                --policy.device の正確な綴りは v0.5.1 の `lerobot-eval --help` で要確認。
+# TODO(lerobot): confirm the exact spelling of --env.task options, --eval.batch_size,
+#                --output_dir, --policy.device via `lerobot-eval --help` for v0.5.1.
 # =============================================================================
 set -euo pipefail
 
 # --- fail-fast ---
-: "${CKPT_REPO:?CKPT_REPO 未設定 (config.env)}"
-: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
+: "${CKPT_REPO:?CKPT_REPO unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${EVAL_EPISODES:=10}"
-: "${ENV_TASK:=libero_object}"   # TODO(lerobot): 配布 ckpt に合う task 名に要調整
+: "${ENV_TASK:=libero_object}"   # TODO(lerobot): adjust to a task matching the distributed ckpt
 
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
-# 評価対象の checkpoint。既定は配布済み repo。
-# 自分の学習成果を評価したい場合は下を OUTPUT_DIR 配下のパスに差し替える:
+# Checkpoint to evaluate. Default is the distributed repo.
+# To evaluate your own training output, replace below with a path under OUTPUT_DIR:
 #   POLICY_PATH="${OUTPUT_DIR}/${JOB_NAME}/checkpoints/last/pretrained_model"
 POLICY_PATH="${CKPT_REPO}"
 
@@ -39,4 +39,4 @@ lerobot-eval \
   --output_dir="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")" \
   --policy.device=cuda
 
-echo "[eval] done. success rate と動画は出力ディレクトリ/ログを参照。"
+echo "[eval] done. See the output dir / log for the success rate and videos."

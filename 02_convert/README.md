@@ -1,39 +1,42 @@
-# 02_convert — 自前データを LeRobot 形式へ変換（Notion Step 5）
+# 02_convert — Convert your own data to LeRobot format (Notion Step 5)
 
-## 目的
+## Goal
 
-手元の「生データ（observation/action の時系列）」を `LeRobotDataset` v3.0 形式に
-変換する流れを体験する。`features`（各キーの dtype/shape）・`fps`・`robot_type` を
-自分で定義し、`add_frame` → `save_episode` → `finalize` の順で書き出す。
+Experience the flow of converting your own "raw data" (observation/action time series)
+into the `LeRobotDataset` v3.0 format. You define `features` (dtype/shape per key),
+`fps`, and `robot_type` yourself, then write it out in the order
+`add_frame` → `save_episode` → `finalize`.
 
-## 前提
+## Prerequisites
 
-- `config.env` を `source` 済み（push する場合は `HF_USER` が必要）。
-- ここではダミーの合成データを使うので、追加の事前DLは不要。
+- `config.env` has been `source`d (need `HF_USER` if you push).
+- This step uses dummy synthetic data, so no extra pre-download is needed.
 
-## 使うもの
+## What you use
 
-- [`convert_sample.py`](./convert_sample.py) — 合成データから小さな LeRobotDataset を作る最小例。
-  - 既定はローカル保存のみ。`--push` を付けると `HF_USER` のリポジトリへ push する（任意）。
+- [`convert_sample.py`](./convert_sample.py) — a minimal example that builds a small
+  LeRobotDataset from synthetic data.
+  - Default is local-save only. With `--push` it pushes to a repo under `HF_USER` (optional).
 
 ```bash
-# ローカルに作るだけ（推奨・オフラインでも可）
+# Just build locally (recommended; works offline)
 python 02_convert/convert_sample.py
 
-# Hub に push する場合（HF_USER 必須・ネット必要・ログインノードで）
+# Push to the Hub (requires HF_USER, needs network, run on the login node)
 python 02_convert/convert_sample.py --push
 ```
 
-## 期待される出力（自己診断の手がかり）
+## Expected output (self-check cues)
 
-- `LeRobotDataset.create(...)` がエラーなく完了し、ローカルに dataset ディレクトリができる。
-- 標準出力に「`N episodes / M frames を書き出しました`」のような要約が出る。
-- 直後に `LeRobotDataset(repo_id)` で読み直し、`dataset[0]['action'].shape` が
-  自分で定義した `features` と一致することを確認できる。
-- `--push` 時は Hub 上に `${HF_USER}/<dataset名>` が作成される。
+- `LeRobotDataset.create(...)` completes without error and a dataset directory appears locally.
+- A summary like "wrote N episodes / M frames" is printed to stdout.
+- Immediately reloading with `LeRobotDataset(repo_id)` shows that `dataset[0]['action'].shape`
+  matches the `features` you defined.
+- With `--push`, a repo `${HF_USER}/<dataset-name>` is created on the Hub.
 
-ポイント:
+Key points:
 
-- **`finalize()` を必ず呼ぶ**（呼ばないと parquet が壊れて読み込めない）。
-- `features` の各エントリは `{"dtype", "shape", "names"}` を持つ。詳細はスクリプト内コメント参照。
-- 実機データの変換は本スクリプトの構造をテンプレに、`add_frame` の中身を差し替える。
+- **Always call `finalize()`** (otherwise the parquet files are corrupt and won't load).
+- Each entry in `features` has `{"dtype", "shape", "names"}`. See the in-script comments.
+- To convert real-robot data, use this script's structure as a template and swap out
+  the contents of `add_frame`.
