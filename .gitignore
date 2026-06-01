@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ===== lerobot-handson =====
+# 当日変わる値（キュー名・課金番号・W&B・HF など）。絶対にコミットしない。
+config.env
+
+# 学習成果物・ログ
+outputs/
+wandb/
+*.sif
+*.out
+*.err

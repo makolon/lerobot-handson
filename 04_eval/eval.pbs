@@ -1,0 +1,46 @@
+#!/bin/bash
+# =============================================================================
+# eval.pbs  —  GH200 計算ノードで lerobot-eval を回す PBS ジョブ
+# -----------------------------------------------------------------------------
+# 投入: source config.env && qsub 04_eval/eval.pbs
+#
+# TODO(miyabi): #PBS の書式（-q / -P / -l select）は公式マニュアルで要確認。
+#               train.pbs と同様、資源値は投入時に -v / qsub 引数で渡す運用。
+# =============================================================================
+
+#PBS -N lerobot_eval
+#PBS -j oe
+# TODO(miyabi): プレースホルダ。投入例は 03_train/train.pbs と同じ要領:
+#   qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 \
+#        -l walltime="$WALLTIME" -v ALL 04_eval/eval.pbs
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+
+if [[ -f config.env ]]; then
+  # shellcheck disable=SC1091
+  source config.env
+fi
+
+# --- fail-fast ---
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE 未設定 (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR 未設定}"
+: "${HF_HOME:?HF_HOME 未設定}"
+
+mkdir -p "${OUTPUT_DIR}"
+
+# オフライン計算ノード向け
+export HF_HUB_OFFLINE=1
+export HF_HOME
+
+if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
+  module load "${APPTAINER_MODULE}"
+fi
+
+apptainer exec --nv \
+  --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
+  --bind "${HF_HOME}:${HF_HOME}" \
+  --env HF_HUB_OFFLINE=1 \
+  --env "HF_HOME=${HF_HOME}" \
+  "${APPTAINER_IMAGE}" \
+  bash 04_eval/eval.sh
