@@ -1,25 +1,4 @@
 #!/bin/bash
-# =============================================================================
-# warmup.pbs  —  tiny PBS job that confirms your environment works on a GH200
-# -----------------------------------------------------------------------------
-# This is the warm-up exercise for 01_hpc. It does no real compute: it just
-# proves the chain "scheduler -> compute node -> GPU -> container -> CUDA" works
-# before any later module depends on it.
-#
-# Submit (after `source config.env`), simply:
-#   qsub 01_hpc/warmup.pbs
-#
-# Unlike 04_train/train.pbs (which takes its resources at submit time so day-of
-# values stay out of git), this first warm-up hard-codes its #PBS directives so
-# the bare `qsub 01_hpc/warmup.pbs` from the README just works. The parametrized
-# "pass -q/-W/-l at submit time" pattern is taught later, in train.pbs.
-#
-# Miyabi PBS syntax (verified 2026-06-08 on Miyabi-G): the billing project is
-# passed with -W group_list=<GROUP> (NOT PBS Pro's -P, which Miyabi rejects).
-# One GH200 node is requested with -l select=1; that node's GPU is allocated
-# automatically (no :ngpus= needed). debug-g is the quick-turnaround full-node
-# GPU queue (walltime <= 00:30:00) — ideal for a warm-up.
-# =============================================================================
 
 #PBS -N warmup
 #PBS -q debug-g
@@ -28,48 +7,8 @@
 #PBS -l walltime=00:10:00
 #PBS -j oe
 
-set -euo pipefail
-
-# PBS may not start in the submit CWD. Move to the repo root.
 cd "${PBS_O_WORKDIR:-$(pwd)}"
-
-# --- load config.env (fallback for values not forwarded via -v ALL) ---
-if [[ -f config.env ]]; then
-  # shellcheck disable=SC1091
-  source config.env
-fi
-
-# --- fail-fast: required variables ---
-: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (source config.env)}"
-
-# Apptainer module (if configured)
-if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
-  module load "${APPTAINER_MODULE}"
-fi
-
-echo "===================================================================="
-echo "[warmup] node    : $(hostname)        <- a compute node, not miyabi-g3"
-echo "[warmup] arch    : $(uname -m)        <- expect aarch64 (ARM)"
-echo "[warmup] image   : ${APPTAINER_IMAGE}"
-echo "===================================================================="
-
-echo "== GPU as seen by the host (driver lives on the node) =="
-nvidia-smi
-
-echo
-echo "== GPU as seen from INSIDE the container (--nv lends the driver) =="
-# --nv  : pass the host GPU + driver through to the container.
-# The torch/CUDA toolkit comes from the .sif; if you forget --nv it reports CPU only.
-apptainer exec --nv "${APPTAINER_IMAGE}" python - <<'PY'
-import torch
-print("torch            :", torch.__version__)
-print("cuda available   :", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("device           :", torch.cuda.get_device_name(0))
-    print("cuda (toolkit)   :", torch.version.cuda)
-else:
-    print("device           : CPU only  <- forgot --nv, or the image is CPU-only")
-PY
-
-echo
-echo "[warmup] done. If 'cuda available' is True, your environment is ready."
+source config.env
+module load "${APPTAINER_MODULE}"
+echo "Running on host: $(hostname)"
+apptainer exec --nv "${APPTAINER_IMAGE}" nvidia-smi
