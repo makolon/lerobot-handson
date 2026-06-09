@@ -233,5 +233,3 @@ wandb/
 
 # smoke-test scratch output
 .smoke/
-
-warmup.*
