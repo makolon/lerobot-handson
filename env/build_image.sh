@@ -11,24 +11,27 @@
 # =============================================================================
 set -euo pipefail
 
-# --- fail-fast: required variables ---
 : "${APPTAINER_IMAGE:?source config.env and set APPTAINER_IMAGE}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEF_FILE="${HERE}/apptainer.def"
 
-# TODO(miyabi): confirm the module needed to use Apptainer/Singularity.
 if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
   module load "${APPTAINER_MODULE}"
 fi
 
-echo "[build] def : ${DEF_FILE}"
-echo "[build] sif : ${APPTAINER_IMAGE}"
+: "${APPTAINER_TMPDIR:=/tmp/${USER}-aptmp}"
+: "${APPTAINER_CACHEDIR:=/tmp/${USER}-apcache}"
+export APPTAINER_TMPDIR APPTAINER_CACHEDIR
+mkdir -p "${APPTAINER_TMPDIR}" "${APPTAINER_CACHEDIR}"
+
+echo "[build] def      : ${DEF_FILE}"
+echo "[build] sif      : ${APPTAINER_IMAGE}"
+echo "[build] tmpdir   : ${APPTAINER_TMPDIR}"
+echo "[build] cachedir : ${APPTAINER_CACHEDIR}"
 
 mkdir -p "$(dirname "${APPTAINER_IMAGE}")"
 
-# Many environments require fakeroot. If you lack the privilege, consider --remote.
-# TODO(miyabi): confirm fakeroot availability / whether --remote is required.
 apptainer build --fakeroot "${APPTAINER_IMAGE}" "${DEF_FILE}"
 
 echo "[build] done. test import:"

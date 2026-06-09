@@ -7,7 +7,7 @@
 #PBS -N broken_02
 #PBS -j oe
 # TODO(miyabi): pass queue/billing/resources at submit time. Example:
-#   qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 \
+#   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 \
 #        -l walltime="$WALLTIME" -v ALL challenges/debug/broken_02_offline.pbs
 
 set -euo pipefail

@@ -2,32 +2,35 @@
 # =============================================================================
 # train.pbs  —  PBS job that runs lerobot-train on a GH200 compute node
 # -----------------------------------------------------------------------------
-# Submit: source config.env && qsub 03_train/train.pbs
+# Submit: source config.env && qsub 04_train/train.pbs
 #
 # Note: #PBS directives do not expand shell variables. So resource values are not
 #       hard-coded here; instead pass config.env values via -v at submit time, or
 #       override them with qsub arguments (see "submit example" below). This keeps
 #       day-of values from being baked into the script.
 #
-# TODO(miyabi): confirm the #PBS syntax below (queue -q / billing -P / resources
-#               -l select) against the JCAHPC/Miyabi official manual. We only assume PBS.
+# Miyabi PBS syntax (verified 2026-06-08 on Miyabi-G): billing project is passed with
+# -W group_list=<GROUP> (NOT PBS Pro's -P, which Miyabi rejects). One GH200 node is
+# requested with -l select=1; that node's GPU is allocated automatically (the job's
+# Resource_List shows ngpus=1, ncpus=72, mem=100gb) — no :ngpus= needed.
 # =============================================================================
 
 #PBS -N lerobot_train
 #PBS -j oe
-# TODO(miyabi): the following are placeholders. Replace with real queue/billing/resource syntax.
-#   -q <QUEUE_NAME>
-#   -P <GROUP>
-#   -l select=1:ngpus=1
-#   -l walltime=01:30:00
+# The following are passed at submit time (not hard-coded, so day-of values stay out
+# of git):
+#   -q <QUEUE_NAME>            e.g. short-g
+#   -W group_list=<GROUP>      e.g. gw13
+#   -l select=<NUM_NODES>      1 node = 1 GH200 (GPU auto-allocated)
+#   -l walltime=<WALLTIME>     e.g. 01:30:00
 #
 # Recommended usage: don't hard-code the above; pass values at submit time.
 #   Submit example:
-#     qsub -q "$QUEUE_NAME" -P "$GROUP" \
-#          -l select=${NUM_NODES}:ngpus=${NUM_GPUS} \
+#     qsub -q "$QUEUE_NAME" -W group_list="$GROUP" \
+#          -l select=${NUM_NODES} \
 #          -l walltime=${WALLTIME} \
 #          -v ALL \
-#          03_train/train.pbs
+#          04_train/train.pbs
 
 set -euo pipefail
 
@@ -46,7 +49,8 @@ fi
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${HF_HOME:?HF_HOME unset}"
 
-mkdir -p "${OUTPUT_DIR}"
+# HF_HOME must exist on the host: apptainer's --bind fails if the source path is missing.
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
 
 # --- environment for the offline compute node ---
 # Compute nodes have no external network. HF uses only the pre-downloaded cache.

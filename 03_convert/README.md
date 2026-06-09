@@ -1,4 +1,4 @@
-# 02_convert — Convert your own data to LeRobot format (Notion Step 5)
+# 03_convert — Convert your own data to LeRobot format (Notion Step 5)
 
 ## Goal
 
@@ -9,10 +9,17 @@ into the `LeRobotDataset` v3.0 format. You define `features` (dtype/shape per ke
 
 ## Prerequisites
 
-- `config.env` has been `source`d (need `HF_USER` only if you `--push`).
-- Raw episodes to convert. Generate synthetic ones (no net/GPU):
+- `config.env` has been `source`d (need `HF_USER` only if you `--push`) and the
+  Apptainer module is loaded (`module load "$APPTAINER_MODULE"`).
+- `HF_HOME` exists on the host. The reload step makes `datasets` write a cache under
+  it, and apptainer's `--bind` needs the source path to exist first:
   ```bash
-  python tools/make_synthetic_dataset.py --format raw --out .smoke/raw
+  mkdir -p "$HF_HOME"
+  ```
+- Raw episodes to convert. Generate synthetic ones (no net/GPU), inside the container:
+  ```bash
+  apptainer exec "$APPTAINER_IMAGE" \
+    python tools/make_synthetic_dataset.py --format raw --out .smoke/raw
   ```
 
 ## What you use
@@ -22,12 +29,23 @@ into the `LeRobotDataset` v3.0 format. You define `features` (dtype/shape per ke
   then **reloads and asserts** the shapes round-trip.
   - Default is local save. `--push` pushes to a repo under `HF_USER` (optional, needs net).
 
+Run it inside the container. The `--bind`/`--env HF_HOME` flags mirror what
+`04_train/train.pbs` and `05_eval/eval.pbs` do: only `$PWD` is auto-mounted, so
+`$HF_HOME` (outside `$PWD`) must be bound explicitly or the reload step fails with
+`Read-only file system: .../hf_home`.
+
 ```bash
 # Build locally (offline)
-python 02_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted
+apptainer exec \
+  --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" \
+  "$APPTAINER_IMAGE" \
+  python 03_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted
 
 # Push to the Hub (requires HF_USER, needs network, run on the login node)
-python 02_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted --push
+apptainer exec \
+  --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" \
+  "$APPTAINER_IMAGE" \
+  python 03_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted --push
 ```
 
 ## Expected output (self-check cues)

@@ -1,20 +1,20 @@
 # Cheatsheet (source for the PDF later)
 
-> Miyabi-specific values are `<TODO>`. The scheduler is **assumed PBS-family**
-> (confirm in the official manual).
-> TODO(miyabi): confirm the qsub/qstat/qdel option syntax, queue names, billing flags.
+> Miyabi-G (GH200) is **PBS Pro**, verified live 2026-06-08. Billing project goes via
+> `-W group_list=<GROUP>` (Miyabi rejects PBS Pro's `-P`). One node = one GH200; the GPU
+> is auto-allocated by `-l select=1` (no `:ngpus=`). List queues with `qstat --rsc`.
 
 ## PBS job operations
 
 | What you want | Command |
 |---------------|---------|
-| Submit a job | `qsub 03_train/train.pbs` |
-| Pass resources at submit | `qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 -l walltime="$WALLTIME" -v ALL 03_train/train.pbs` |
-| List your jobs | `qstat -u $USER` |
-| All jobs | `qstat` |
+| Submit a job | `qsub 04_train/train.pbs` |
+| Pass resources at submit | `qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 -l walltime="$WALLTIME" -v ALL 04_train/train.pbs` |
+| List your jobs | `qstat -u $USER` (or just `qstat`) |
+| Queues & your allocation | `qstat --rsc` / `qstat --limit` |
 | Job details | `qstat -f <jobid>` |
 | Delete a job | `qdel <jobid>` |
-| Reserve interactive node | `qsub -I -q "$QUEUE_NAME_INTERACTIVE" ...` (TODO(miyabi): confirm syntax) |
+| Reserve interactive node | `qsub -I -q "$QUEUE_NAME_INTERACTIVE" -W group_list="$GROUP" -l select=1 -l walltime=00:15:00` |
 
 ### Job status symbols (general PBS)
 - `Q` = queued / `R` = running / `E` = exiting / `C` or gone = completed
@@ -49,8 +49,8 @@
 
 | Purpose | Entry point | Note |
 |---------|-------------|------|
-| Train | `qsub 03_train/train.pbs` | body is `03_train/train.sh` (`lerobot-train`) |
-| Eval | `qsub 04_eval/eval.pbs` | body is `04_eval/eval.sh` (`lerobot-eval`) |
+| Train | `qsub 04_train/train.pbs` | body is `04_train/train.sh` (`lerobot-train`) |
+| Eval | `qsub 05_eval/eval.pbs` | body is `05_eval/eval.sh` (`lerobot-eval`) |
 | Tuning | `bash challenges/leaderboard/run_tuning.sh` | assumes an interactive node |
 | Inspect data | `01_dataset/explore.ipynb` | `LeRobotDataset` |
 | Convert | `python 02_convert/convert_sample.py` | `--push` to the Hub |
@@ -60,4 +60,4 @@
 - `CUDA out of memory` → lower `--batch_size`
 - Hangs on external connection → missing `HF_HUB_OFFLINE=1` / `HF_HOME`
 - `FileNotFoundError` → is the data area in `apptainer --bind`?
-- `qsub` rejected / killed immediately → check queue name / walltime
+- `qsub` rejected / killed immediately → check queue name / walltime / `-W group_list=` (not `-P`)

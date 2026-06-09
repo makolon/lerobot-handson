@@ -2,17 +2,17 @@
 # =============================================================================
 # eval.pbs  —  PBS job that runs lerobot-eval on a GH200 compute node
 # -----------------------------------------------------------------------------
-# Submit: source config.env && qsub 04_eval/eval.pbs
+# Submit: source config.env && qsub 05_eval/eval.pbs
 #
-# TODO(miyabi): confirm the #PBS syntax (-q / -P / -l select) against the official
-#               manual. As with train.pbs, pass resource values at submit time via -v / qsub args.
+# Miyabi PBS syntax (verified 2026-06-08): billing via -W group_list=, one GH200 via
+# -l select=1 (GPU auto-allocated). Pass resource values at submit time (-v ALL).
 # =============================================================================
 
 #PBS -N lerobot_eval
 #PBS -j oe
-# TODO(miyabi): placeholders. Submit example is the same as 03_train/train.pbs:
-#   qsub -q "$QUEUE_NAME" -P "$GROUP" -l select=1:ngpus=1 \
-#        -l walltime="$WALLTIME" -v ALL 04_eval/eval.pbs
+# Submit example (same shape as 04_train/train.pbs):
+#   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 \
+#        -l walltime="$WALLTIME" -v ALL 05_eval/eval.pbs
 
 set -euo pipefail
 cd "${PBS_O_WORKDIR:-$(pwd)}"
@@ -27,7 +27,8 @@ fi
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${HF_HOME:?HF_HOME unset}"
 
-mkdir -p "${OUTPUT_DIR}"
+# HF_HOME must exist on the host: apptainer's --bind fails if the source path is missing.
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
 
 # Environment for the offline compute node
 export HF_HUB_OFFLINE=1

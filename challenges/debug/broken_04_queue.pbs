@@ -9,7 +9,7 @@
 #PBS -j oe
 #PBS -q gpu_debug_queue
 #PBS -l walltime=00:01:00
-# TODO(miyabi): billing/resources are meant to be passed at submit time via -P / -l select.
+# Note: billing/resources are meant to be passed at submit time via -W group_list= / -l select.
 
 set -euo pipefail
 cd "${PBS_O_WORKDIR:-$(pwd)}"
