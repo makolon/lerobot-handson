@@ -29,15 +29,15 @@
 #     qsub -q "$QUEUE_NAME" -W group_list="$GROUP" \
 #          -l select=${NUM_NODES} \
 #          -l walltime=${WALLTIME} \
-#          -v ALL \
-#          04_train/train.pbs
+#          04_policy_training/train.pbs
+#   (no -v/-V: Miyabi rejects sending the submit env — the job sources config.env itself.)
 
 set -euo pipefail
 
 # PBS may not start in the submit CWD. Move to the repo root.
 cd "${PBS_O_WORKDIR:-$(pwd)}"
 
-# --- load config.env (fallback for values not passed via -v ALL) ---
+# --- load config.env (the job's source of truth; Miyabi can't forward submit env) ---
 if [[ -f config.env ]]; then
   # shellcheck disable=SC1091
   source config.env
@@ -49,13 +49,18 @@ fi
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${HF_HOME:?HF_HOME unset}"
 
+# W&B runs OFFLINE on the compute node (no network). Runs are written to
+# $WANDB_DIR/wandb/offline-run-* and synced later from the login node.
+: "${WANDB_MODE:=offline}"
+: "${WANDB_DIR:=${OUTPUT_DIR}}"
+
 # HF_HOME must exist on the host: apptainer's --bind fails if the source path is missing.
-mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}"
 
 # --- environment for the offline compute node ---
 # Compute nodes have no external network. HF uses only the pre-downloaded cache.
 export HF_HUB_OFFLINE=1
-export HF_HOME
+export HF_HOME WANDB_MODE WANDB_DIR
 
 # Apptainer module (if needed)
 # TODO(miyabi): confirm the Apptainer/Singularity module name
@@ -68,10 +73,13 @@ fi
 # --bind   : make data / output / HF cache visible inside the container (important).
 #            Forgetting this causes FileNotFoundError (see challenges/debug/broken_03).
 apptainer exec --nv \
+  --home "${HF_HOME}" \
   --bind "${DATA_DIR}:${DATA_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
   --env HF_HUB_OFFLINE=1 \
   --env "HF_HOME=${HF_HOME}" \
+  --env "WANDB_MODE=${WANDB_MODE}" \
+  --env "WANDB_DIR=${WANDB_DIR}" \
   "${APPTAINER_IMAGE}" \
-  bash 03_train/train.sh
+  bash 04_policy_training/train.sh

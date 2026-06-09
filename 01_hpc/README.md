@@ -332,7 +332,7 @@ Step 6 — now do it the batch way (the real workflow). Submit the tiny warm-up 
 # select=1, walltime=00:10:00, -j oe) so this first submit is a single command.
 # The parametrized "pass -q/-W/-l at submit time" pattern is taught later in train.pbs.
 qsub 01_hpc/warmup.pbs          # prints a job id, e.g. 12345.opbs
-qstat -u $USER                  # watch Q -> R -> (disappears when done)
+qstat                  # watch Q -> R -> (disappears when done)
 cat warmup.o*                   # read the merged output log (nvidia-smi + torch check)
 ```
 
@@ -432,7 +432,7 @@ Submit and check:
 
 ```bash
 qsub 01_hpc/warmup.pbs   # prints a job id, e.g. 12345.opbs
-qstat -u $USER           # Q = waiting, R = running
+qstat           # Q = waiting, R = running
 qdel 12345               # cancel it if it is stuck in Q
 cat warmup.o12345        # after it finishes: host name + nvidia-smi (one file, -j oe)
 ```

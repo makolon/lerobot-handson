@@ -9,8 +9,8 @@
 | What you want | Command |
 |---------------|---------|
 | Submit a job | `qsub 04_train/train.pbs` |
-| Pass resources at submit | `qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 -l walltime="$WALLTIME" -v ALL 04_train/train.pbs` |
-| List your jobs | `qstat -u $USER` (or just `qstat`) |
+| Pass resources at submit | `qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 -l walltime="$WALLTIME" 04_policy_training/train.pbs` (no -v/-V: Miyabi rejects forwarding the submit env; the job sources config.env) |
+| List your jobs | `qstat` (Miyabi qstat has no -u flag) |
 | Queues & your allocation | `qstat --rsc` / `qstat --limit` |
 | Job details | `qstat -f <jobid>` |
 | Delete a job | `qdel <jobid>` |

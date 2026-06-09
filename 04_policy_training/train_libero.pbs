@@ -1,0 +1,86 @@
+#!/bin/bash
+# =============================================================================
+# train_libero.pbs  —  train ACT on the shared LIBERO dataset on a GH200 node
+# -----------------------------------------------------------------------------
+# Prereq: 04_policy_training/download_libero.sh has put the dataset in the share
+#         ($LIBERO_ROOT) and pre-cached the ResNet18 backbone ($TORCH_HOME).
+#
+# Submit from the repo root (like train.pbs — resources are passed at submit time,
+# so day-of values stay out of git):
+#   source config.env
+#   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" \
+#        -l select=1 -l walltime="$WALLTIME" \
+#        04_policy_training/train_libero.pbs
+# (no -v/-V: Miyabi rejects sending the submit env — the job sources config.env itself.)
+#
+# Miyabi PBS: project via -W group_list=<GROUP> (NOT -P); -l select=1 gives one
+# GH200 node with its GPU auto-allocated (no :ngpus=).
+# =============================================================================
+
+#PBS -N libero_act_train
+#PBS -j oe
+
+set -euo pipefail
+
+# PBS may not start in the submit CWD. Move to the repo root.
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+
+if [[ -f config.env ]]; then
+  # shellcheck disable=SC1091
+  source config.env
+fi
+
+# --- fail-fast: required variables ---
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
+
+# Shared LIBERO dataset + backbone cache (populated by download_libero.sh).
+: "${SHARE_DIR:=/work/gw13/share/handson}"
+: "${LIBERO_ROOT:=${SHARE_DIR}/libero}"
+: "${TORCH_HOME:=${SHARE_DIR}/torch}"
+
+if [[ ! -d "${LIBERO_ROOT}" ]]; then
+  echo "ERROR: LIBERO dataset not found at ${LIBERO_ROOT}." >&2
+  echo "       Run download_libero.sh on the login node first." >&2
+  exit 1
+fi
+
+# W&B runs OFFLINE on the compute node (no network). Runs are written to
+# $WANDB_DIR/wandb/offline-run-* and synced later from the login node.
+: "${WANDB_MODE:=offline}"
+: "${WANDB_DIR:=${OUTPUT_DIR}}"
+
+# Bind sources must exist on the host (apptainer --bind fails otherwise).
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${TORCH_HOME}" "${WANDB_DIR}"
+
+# --- offline compute node: use only pre-downloaded caches ---
+export HF_HUB_OFFLINE=1
+export HF_HOME TORCH_HOME WANDB_MODE WANDB_DIR
+
+# Apptainer module (if needed)
+if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
+  module load "${APPTAINER_MODULE}"
+fi
+
+# --- run train_libero.sh inside the container ---
+# --nv     : pass the GPU through
+# --bind   : the shared dataset (read-only), outputs, HF cache, and the torch
+#            backbone cache must all be visible inside the container.
+# --env    : forward the paths so train_libero.sh resolves DATASET_ROOT and the
+#            offline/backbone settings the same way inside the container.
+apptainer exec --nv \
+  --home "${HF_HOME}" \
+  --bind "${LIBERO_ROOT}:${LIBERO_ROOT}:ro" \
+  --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
+  --bind "${HF_HOME}:${HF_HOME}" \
+  --bind "${TORCH_HOME}:${TORCH_HOME}" \
+  --env HF_HUB_OFFLINE=1 \
+  --env "HF_HOME=${HF_HOME}" \
+  --env "TORCH_HOME=${TORCH_HOME}" \
+  --env "SHARE_DIR=${SHARE_DIR}" \
+  --env "LIBERO_ROOT=${LIBERO_ROOT}" \
+  --env "WANDB_MODE=${WANDB_MODE}" \
+  --env "WANDB_DIR=${WANDB_DIR}" \
+  "${APPTAINER_IMAGE}" \
+  bash 04_policy_training/train_libero.sh

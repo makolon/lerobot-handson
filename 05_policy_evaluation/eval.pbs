@@ -5,14 +5,15 @@
 # Submit: source config.env && qsub 05_eval/eval.pbs
 #
 # Miyabi PBS syntax (verified 2026-06-08): billing via -W group_list=, one GH200 via
-# -l select=1 (GPU auto-allocated). Pass resource values at submit time (-v ALL).
+# -l select=1 (GPU auto-allocated). Pass resource values at submit time.
+# (no -v/-V: Miyabi rejects forwarding the submit env — the job sources config.env.)
 # =============================================================================
 
 #PBS -N lerobot_eval
 #PBS -j oe
-# Submit example (same shape as 04_train/train.pbs):
+# Submit example (same shape as 04_policy_training/train.pbs):
 #   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 \
-#        -l walltime="$WALLTIME" -v ALL 05_eval/eval.pbs
+#        -l walltime="$WALLTIME" 05_policy_evaluation/eval.pbs
 
 set -euo pipefail
 cd "${PBS_O_WORKDIR:-$(pwd)}"

@@ -62,3 +62,55 @@ DATA_REPO=handson/synthetic DATASET_ROOT=.smoke/synthetic OUTPUT_DIR=.smoke/outp
 
 If something goes wrong, recall the four typical patterns in `challenges/debug/`
 (OOM / offline / missing bind / wrong queue name).
+
+## Train ACT on the shared LIBERO dataset
+
+A concrete end-to-end recipe: download the LeRobot LIBERO dataset
+([`HuggingFaceVLA/libero`](https://huggingface.co/datasets/HuggingFaceVLA/libero) —
+all suites, dual-camera + 8-D state + 7-D action) into the **shared** area once, then
+train ACT from it offline. Everyone reuses the one shared copy.
+
+| File | Role |
+|------|------|
+| [`download_libero.sh`](./download_libero.sh) | **login node**: download the dataset into `/work/gw13/share/handson/libero`, warm-load it (caches any format conversion), and pre-cache the ACT ResNet18 ImageNet backbone into `/work/gw13/share/handson/torch` |
+| [`train_libero.sh`](./train_libero.sh) | LIBERO config layer over `train.sh` — sets `--policy.type=act`, `--dataset.root=$LIBERO_ROOT`, sensible steps/batch |
+| [`train_libero.pbs`](./train_libero.pbs) | PBS wrapper: binds the shared dataset (read-only) + backbone cache, runs `train_libero.sh` offline on a GH200 |
+
+### 1. Download into the share (login node, has internet)
+
+```bash
+source config.env                       # need APPTAINER_IMAGE / APPTAINER_MODULE
+bash 04_policy_training/download_libero.sh
+# -> /work/gw13/share/handson/libero   (dataset; `du -sh` to check size)
+# -> /work/gw13/share/handson/torch    (ResNet18 backbone cache)
+```
+
+Compute nodes are offline, so this **must** run on the login node. It pulls the
+dataset and the backbone once; later jobs read both from the share.
+
+### 2. Train ACT offline (GH200 compute node)
+
+```bash
+source config.env
+qsub -q "$QUEUE_NAME" -W group_list="$GROUP" \
+     -l select=1 -l walltime="$WALLTIME" \
+     04_policy_training/train_libero.pbs
+qstat          # Q -> R -> done
+cat libero_act_train.o<jobid>  # read THIS job by id (the *.o glob also catches OLD runs)
+```
+
+Checkpoints land under `OUTPUT_DIR/libero_act/checkpoints/<step>/pretrained_model`,
+and (if `WANDB_*` is configured) a loss curve appears in the shared W&B.
+
+**Tuning** (all optional — Miyabi can't forward the submit env, so set these by adding
+`export LIBERO_...=...` lines to `config.env`, which the job sources): `LIBERO_STEPS`
+(default 50000), `LIBERO_BATCH` (default 32 — a GH200's ~96 GB can go higher),
+`LIBERO_JOB_NAME`, `LIBERO_ROOT` (dataset path), `LIBERO_REPO`. To skip the ImageNet
+backbone entirely (random init, fully offline-safe without step 1's pre-cache),
+add `PRETRAINED_BACKBONE_WEIGHTS=null`.
+
+> The eval module ([`05_policy_evaluation`](../05_policy_evaluation/)) defaults to
+> `--env.type=libero --env.task=libero_object`, so an ACT policy trained here is the
+> matching thing to evaluate. Note in-sim eval needs the LIBERO simulator
+> (`MUJOCO_GL=egl`), whose aarch64 deps are still unconfirmed — training itself does
+> not need the simulator.

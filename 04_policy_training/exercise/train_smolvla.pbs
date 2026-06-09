@@ -1,0 +1,73 @@
+#!/bin/bash
+# =============================================================================
+# train_smolvla.pbs  —  ANSWER to Exercise Q2 (batch variant)
+# -----------------------------------------------------------------------------
+# Fine-tune SmolVLA on an ALOHA Sim dataset on a GH200 node, offline.
+#
+# The exercise text drives this interactively (qsub -I + apptainer shell); this
+# PBS wrapper is the batch equivalent, matching the rest of 04_policy_training so
+# you can submit-and-walk-away. Either path runs the SAME train_smolvla.sh body.
+#
+# Prereq: exercise/download_aloha_sim.sh has cached the dataset + lerobot/smolvla_base
+#         into $HF_HOME on the login node (compute nodes are offline).
+#
+# Submit from the repo root (resources passed at submit time, like train.pbs):
+#   source config.env
+#   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" \
+#        -l select=1 -l walltime="$WALLTIME" \
+#        04_policy_training/exercise/train_smolvla.pbs
+# (no -v/-V: Miyabi rejects sending the submit env — the job sources config.env itself.)
+#
+# Miyabi PBS: project via -W group_list=<GROUP> (NOT -P); -l select=1 gives one
+# GH200 node with its GPU auto-allocated (no :ngpus=).
+# =============================================================================
+
+#PBS -N smolvla_aloha_train
+#PBS -j oe
+
+set -euo pipefail
+
+# PBS may not start in the submit CWD. Move to the repo root.
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+
+if [[ -f config.env ]]; then
+  # shellcheck disable=SC1091
+  source config.env
+fi
+
+# --- fail-fast: required variables ---
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
+
+# W&B runs OFFLINE on the compute node (no network). Runs are written to
+# $WANDB_DIR/wandb/offline-run-* and synced later from the login node.
+: "${WANDB_MODE:=offline}"
+: "${WANDB_DIR:=${OUTPUT_DIR}}"
+
+# Bind sources must exist on the host (apptainer --bind fails otherwise).
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}"
+
+# --- offline compute node: use only the pre-downloaded HF cache ---
+export HF_HUB_OFFLINE=1
+export HF_HOME WANDB_MODE WANDB_DIR
+
+# Apptainer module (if needed)
+if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
+  module load "${APPTAINER_MODULE}"
+fi
+
+# --- run train_smolvla.sh inside the container ---
+# --nv     : pass the GPU through
+# --bind   : the HF cache (dataset + smolvla_base) and outputs must be visible.
+#            The dataset and base model are resolved by repo_id from HF_HOME.
+apptainer exec --nv \
+  --home "${HF_HOME}" \
+  --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
+  --bind "${HF_HOME}:${HF_HOME}" \
+  --env HF_HUB_OFFLINE=1 \
+  --env "HF_HOME=${HF_HOME}" \
+  --env "WANDB_MODE=${WANDB_MODE}" \
+  --env "WANDB_DIR=${WANDB_DIR}" \
+  "${APPTAINER_IMAGE}" \
+  bash 04_policy_training/exercise/train_smolvla.sh
