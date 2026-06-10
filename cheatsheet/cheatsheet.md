@@ -8,7 +8,7 @@
 
 | What you want | Command |
 |---------------|---------|
-| Submit a job | `qsub 04_train/train.pbs` |
+| Submit a job | `qsub 04_policy_training/train.pbs` |
 | Pass resources at submit | `qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 -l walltime="$WALLTIME" 04_policy_training/train.pbs` (no -v/-V: Miyabi rejects forwarding the submit env; the job sources config.env) |
 | List your jobs | `qstat` (Miyabi qstat has no -u flag) |
 | Queues & your allocation | `qstat --rsc` / `qstat --limit` |
@@ -49,14 +49,13 @@
 
 | Purpose | Entry point | Note |
 |---------|-------------|------|
-| Train | `qsub 04_train/train.pbs` | body is `04_train/train.sh` (`lerobot-train`) |
-| Eval | `qsub 05_eval/eval.pbs` | body is `05_eval/eval.sh` (`lerobot-eval`) |
-| Tuning | `bash challenges/leaderboard/run_tuning.sh` | assumes an interactive node |
-| Inspect data | `01_dataset/explore.ipynb` | `LeRobotDataset` |
-| Convert | `python 02_convert/convert_sample.py` | `--push` to the Hub |
+| Train | `qsub 04_policy_training/train.pbs` | body is `04_policy_training/train.sh` (`lerobot-train`) |
+| Eval | `qsub 05_policy_evaluation/eval.pbs` | body is `05_policy_evaluation/eval.sh` (`lerobot-eval`) |
+| Inspect data | `02_imitation_learning/explore.ipynb` | `LeRobotDataset` |
+| Convert | `python 03_dataset_conversion/convert_sample.py` | `--push` to the Hub |
 | Pre-download | `bash env/predownload_hf.sh` | on the login node |
 
-## Common failures → what to suspect first (maps to challenges/debug)
+## Common failures → what to suspect first
 - `CUDA out of memory` → lower `--batch_size`
 - Hangs on external connection → missing `HF_HUB_OFFLINE=1` / `HF_HOME`
 - `FileNotFoundError` → is the data area in `apptainer --bind`?

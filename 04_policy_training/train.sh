@@ -2,8 +2,8 @@
 # =============================================================================
 # train.sh  —  the lerobot-train body (runs inside the container)
 # -----------------------------------------------------------------------------
-# Called from: 03_train/train.pbs (via apptainer exec) on Miyabi.
-# Also exercised directly by tools/smoke_test.sh on CPU (no GPU/net).
+# Called from: 04_policy_training/train.pbs (via apptainer exec) on Miyabi.
+# Can also be rehearsed directly on CPU with the synthetic dataset (no GPU/net).
 #
 # Real lerobot-train invocation (verified with lerobot==0.5.1). Everything here is
 # bucket-2 (runs anywhere); only train.pbs carries bucket-1 #PBS placeholders.
@@ -75,7 +75,7 @@ fi
 [[ -n "${CHUNK_SIZE:-}" ]]      && ARGS+=( --policy.chunk_size="${CHUNK_SIZE}" )
 [[ -n "${N_OBS_STEPS:-}" ]]     && ARGS+=( --policy.n_obs_steps="${N_OBS_STEPS}" )
 [[ -n "${N_ACTION_STEPS:-}" ]]  && ARGS+=( --policy.n_action_steps="${N_ACTION_STEPS}" )
-# "null" skips the ResNet ImageNet download (used by the offline smoke test)
+# "null" skips the ResNet ImageNet download (random-init backbone, fully offline-safe)
 [[ -n "${PRETRAINED_BACKBONE_WEIGHTS:-}" ]] && \
   ARGS+=( --policy.pretrained_backbone_weights="${PRETRAINED_BACKBONE_WEIGHTS}" )
 

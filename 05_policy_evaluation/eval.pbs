@@ -2,7 +2,7 @@
 # =============================================================================
 # eval.pbs  —  PBS job that runs lerobot-eval on a GH200 compute node
 # -----------------------------------------------------------------------------
-# Submit: source config.env && qsub 05_eval/eval.pbs
+# Submit: source config.env && qsub 05_policy_evaluation/eval.pbs
 #
 # Miyabi PBS syntax (verified 2026-06-08): billing via -W group_list=, one GH200 via
 # -l select=1 (GPU auto-allocated). Pass resource values at submit time.
@@ -45,4 +45,4 @@ apptainer exec --nv \
   --env HF_HUB_OFFLINE=1 \
   --env "HF_HOME=${HF_HOME}" \
   "${APPTAINER_IMAGE}" \
-  bash 04_eval/eval.sh
+  bash 05_policy_evaluation/eval.sh

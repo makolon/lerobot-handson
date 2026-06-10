@@ -12,8 +12,8 @@
 # Note: eval.batch_size must be <= eval.n_episodes (lerobot raises otherwise).
 #
 # LIBERO needs simulation deps that may not be present on every machine, so set
-#   DRY_RUN=1  to print the exact command without executing it (used by the smoke
-#   test to verify command construction). Set POLICY_DEVICE=cpu to evaluate on CPU.
+#   DRY_RUN=1  to print the exact command without executing it (handy to verify the
+#   command construction off-Miyabi). Set POLICY_DEVICE=cpu to evaluate on CPU.
 #
 # Overridable env vars:
 #   CKPT_REPO / POLICY_PATH   checkpoint to evaluate (repo_id or local dir)
@@ -39,6 +39,12 @@ set -euo pipefail
 POLICY_PATH="${POLICY_PATH:-${CKPT_REPO:?set CKPT_REPO or POLICY_PATH}}"
 
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+
+# Headless GPU rendering for the LIBERO simulator. Miyabi sets CUDA_VISIBLE_DEVICES to
+# a GPU *UUID*, which robosuite's EGL device picker can't parse as an int; it prefers
+# MUJOCO_EGL_DEVICE_ID, so pin a numeric EGL index (each Miyabi-G node = 1 GPU).
+export MUJOCO_GL="${MUJOCO_GL:-egl}"
+export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
 
 ARGS=(
   --policy.path="${POLICY_PATH}"

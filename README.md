@@ -14,9 +14,9 @@ supercomputer **Miyabi (JCAHPC / NVIDIA GH200 Grace Hopper, aarch64)**.
 | Reference docs | https://huggingface.co/docs/lerobot/index |
 
 > The CLI arguments (`lerobot-train` / `lerobot-eval`, the `LeRobotDataset` API) were
-> verified against an actual `lerobot==0.5.1` install (see the smoke test below). The
-> only remaining unknowns are Miyabi-specific (queue/billing/`module`) and the aarch64
-> container build + GPU; those carry `# TODO(miyabi)` markers and are in the checklist.
+> verified against an actual `lerobot==0.5.1` install. The only remaining unknowns are
+> Miyabi-specific (queue/billing/`module`) and the aarch64 container build + GPU; those
+> carry `# TODO(miyabi)` markers and are in the checklist.
 
 ## Quick start
 
@@ -31,36 +31,29 @@ source config.env       # every script assumes these variables are set
 Each script **fails fast with a clear error** if a required environment variable is
 unset. Day-of values are never hard-coded in scripts; they all flow through `config.env`.
 
-## Offline smoke test (no GPU, no network, no Miyabi)
+## Rehearse the steps offline (no GPU, no network, no Miyabi)
 
-The whole exercise path runs on a laptop against synthetic data, so you can sanity-check
-the repo before the event. In an environment with `lerobot==0.5.1` installed:
+Every step's code (data → convert → train → eval) is plain Python/bash that runs
+anywhere against synthetic data, so you can rehearse it before the event in an
+environment with `lerobot==0.5.1` installed: generate a synthetic `LeRobotDataset` with
+`03_dataset_conversion/make_synthetic_dataset.py`, then run `train.sh` / `eval.sh` with
+`POLICY_DEVICE=cpu` (each step's README shows the exact command). Scratch output goes to
+`.smoke/` (git-ignored).
 
-```bash
-make smoke                       # or: PYTHON=/path/to/venv/bin/python make smoke
-```
-
-It generates a synthetic `LeRobotDataset`, loads it, converts raw episodes, trains ACT
-for a few CPU steps via `03_train/train.sh`, runs the leaderboard tuner, verifies the
-`lerobot-eval` command, and executes `01_dataset/explore.ipynb`. Scratch output goes to
-`.smoke/` (git-ignored). See [`tools/`](./tools/) for the generator and the harness.
-
-> The data/convert/train/tune/notebook code is "bucket 2" — it runs anywhere and
-> carries **no `# TODO`**. Only Miyabi-specific scheduler/site values ("bucket 1") are
+> This data/convert/train/notebook code is "bucket 2" — it runs anywhere and carries
+> **no `# TODO`**. Only Miyabi-specific scheduler/site values ("bucket 1") are
 > placeholders.
 
 ## Directory layout
 
 | Directory | Contents |
 |-----------|----------|
-| `slides/` | Architecture lecture |
-| `01_dataset/` | Inspect a dataset and the Hub |
-| `02_convert/` | Convert to LeRobot format |
+| `01_hpc/` | HPC / Miyabi & Apptainer warm-up |
+| `02_imitation_learning/` | Inspect a dataset and the Hub |
+| `03_dataset_conversion/` | Convert your own data to LeRobot format |
+| `04_policy_training/` | Training job (main) |
+| `05_policy_evaluation/` | Evaluation in the LIBERO simulator |
 | `env/` | Apptainer image / HF pre-download |
-| `03_train/` | Training job (main) |
-| `04_eval/` | Evaluation |
-| `challenges/debug/` | Bonus 1: debug a broken job |
-| `challenges/leaderboard/` | Bonus 2: short tuning competition |
 | `cheatsheet/` | qsub/qstat/qdel quick reference |
 
 Operational policy for maintainers (pin tags, `step-XX-start` tags, the `solutions`

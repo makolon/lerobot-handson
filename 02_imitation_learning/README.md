@@ -1,4 +1,4 @@
-# 01_dataset — Inspect a dataset and the Hub (Notion Step 4)
+# 02_imitation_learning — Inspect a dataset and the Hub (Notion Step 4)
 
 ## Goal
 
@@ -12,7 +12,7 @@ Hub and check observation/action shapes, fps, and camera images with your own ey
   `DATA_REPO` with `env/predownload_hf.sh` so it reads offline via `HF_HUB_OFFLINE=1`.
 - Offline/standalone (laptop): build the synthetic dataset and point the notebook at it:
   ```bash
-  python tools/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
+  python 03_dataset_conversion/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
   export DATA_REPO=handson/synthetic
   export LEROBOT_DATASET_ROOT=$PWD/.smoke/synthetic
   ```

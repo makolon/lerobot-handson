@@ -1,4 +1,4 @@
-# 03_train — Submit a training job (main / Notion Step 7)
+# 04_policy_training — Submit a training job (main / Notion Step 7)
 
 ## Goal
 
@@ -28,7 +28,7 @@ is a lightweight policy + few steps**. The design prioritizes the experience of
 
 ```bash
 source config.env
-qsub 03_train/train.pbs        # submit the job
+qsub 04_policy_training/train.pbs        # submit the job
 qstat                          # check status (see cheatsheet/)
 ```
 
@@ -50,18 +50,18 @@ Logs go to the PBS stdout/stderr (`*.out` / `*.err`).
 ## Try it locally first
 
 `train.sh` is driven by environment variables, so you can rehearse on CPU with the
-synthetic dataset (this is exactly what `make smoke` does):
+synthetic dataset:
 
 ```bash
-python tools/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
+python 03_dataset_conversion/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
 DATA_REPO=handson/synthetic DATASET_ROOT=.smoke/synthetic OUTPUT_DIR=.smoke/outputs \
   POLICY_DEVICE=cpu TRAIN_STEPS=2 BATCH_SIZE=2 \
   CHUNK_SIZE=8 N_OBS_STEPS=1 N_ACTION_STEPS=8 PRETRAINED_BACKBONE_WEIGHTS=null \
-  bash 03_train/train.sh
+  bash 04_policy_training/train.sh
 ```
 
-If something goes wrong, recall the four typical patterns in `challenges/debug/`
-(OOM / offline / missing bind / wrong queue name).
+If something goes wrong, the usual suspects are OOM (lower `BATCH_SIZE`), a missing
+`HF_HUB_OFFLINE=1`/`HF_HOME`, a forgotten `--bind`, or a wrong queue name.
 
 ## Train ACT on the shared LIBERO dataset
 

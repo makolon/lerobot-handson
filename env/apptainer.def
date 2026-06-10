@@ -37,6 +37,23 @@ From: nvcr.io/nvidia/pytorch:25.06-py3
     # below sets its own PIP_CONSTRAINT to pin the CUDA pair we install.
     unset PIP_CONSTRAINT
 
+    # ---- System GL/EGL stack for headless MuJoCo (MUJOCO_GL=egl) rendering ----
+    # The NGC base is compute-only and has NO GL/EGL libraries. LIBERO/robosuite render
+    # via MuJoCo's EGL backend, and PyOpenGL needs libglvnd's libEGL.so.1 present in the
+    # IMAGE (the NVIDIA *vendor* lib libEGL_nvidia is bound in at runtime by
+    # `apptainer --nv`). Without these, importing the env dies at `_p.PLATFORM.EGL is
+    # None`. Verified the package set resolves on Ubuntu 24.04/noble arm64 (2026-06-10).
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        libglvnd0 libgl1 libglx0 libegl1 libgles2 libopengl0 \
+        libegl-mesa0 libgl1-mesa-dri
+    rm -rf /var/lib/apt/lists/*
+    # Register the NVIDIA EGL vendor so libglvnd dispatches to the driver's libEGL
+    # (bound in by --nv) instead of mesa. Harmless if --nv also provides this file.
+    mkdir -p /usr/share/glvnd/egl_vendor.d
+    printf '%s\n' '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' \
+        > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+
     python -m pip install --no-cache-dir --upgrade pip
 
     # ---- CUDA torch/torchvision (aarch64 / SBSA) ----
@@ -63,33 +80,93 @@ print(f"torchvision=={torchvision.__version__}")
 PY
     echo "[def] pinned CUDA builds:"; cat /tmp/torch-constraints.txt
 
+    # ---- Fix the broken cmake shim (needed to build egl_probe in [libero]) ----
+    # The NGC base ships /usr/local/bin/cmake as a PYTHON shim (`from cmake import
+    # cmake`). The lerobot[libero] extra pulls hf-egl-probe/egl_probe, which compile a
+    # C++ EGL-probe with CMake. Under pip's PEP517 build isolation, that shim inherits
+    # pip's PYTHONPATH (pointing at the isolated build overlay, which has no `cmake`
+    # module), so `cmake --version` dies with ModuleNotFoundError and the wheel build
+    # fails. Point cmake at the native binary the `cmake` pip package already bundles —
+    # a real ELF, immune to PYTHONPATH. Verified 2026-06-10 on the GH200 base image.
+    CMAKE_NATIVE="$(python -c 'import cmake, os; print(os.path.join(os.path.dirname(cmake.__file__), "data", "bin", "cmake"))')"
+    test -x "${CMAKE_NATIVE}"
+    ln -sf "${CMAKE_NATIVE}" /usr/local/bin/cmake
+    echo "[def] cmake -> ${CMAKE_NATIVE}"; PYTHONPATH=/nonexistent cmake --version | head -1
+
     # ---- Install LeRobot at the pinned commit ----
-    # The extras are policy/sim dependencies. If an extra cannot build on aarch64,
-    # drop it and record it in the TODO below (do not leave a "looks like it works").
-    # TODO(lerobot): confirm the extras names against the v0.5.1 pyproject
-    #                (e.g. [pi0], [smolvla], [aloha], [libero]).
-    # TODO(lerobot): some sim deps (mujoco/libero) may need a separate aarch64 build.
+    # Extras are policy/sim dependencies:
+    #   [aloha]  -> ALOHA sim + gym-aloha
+    #   [libero] -> LIBERO eval suite. On Linux this pulls `hf-libero` (HF-packaged
+    #               LIBERO that provides the `libero` python module), plus
+    #               transformers/scipy. hf-libero is an sdist but pure-Python; its
+    #               native deps (mujoco, robosuite 1.4.0, opencv) ship aarch64 wheels,
+    #               so it builds on GH200. Required by 05_policy_evaluation (eval.sh
+    #               defaults to the libero_object suite). Verified 2026-06-10 against
+    #               lerobot 0.5.1 metadata (extra "libero" -> hf-libero>=0.1.3,<0.2.0).
     PIP_CONSTRAINT=/tmp/torch-constraints.txt pip install --no-cache-dir \
-        "lerobot[aloha] @ git+https://github.com/huggingface/lerobot.git@v0.5.1"
+        "lerobot[aloha,libero] @ git+https://github.com/huggingface/lerobot.git@v0.5.1"
 
     # Fail the build LOUDLY if torch lost its CUDA build (e.g. a future base too old
     # for the constraint). Far better than shipping a silently CPU-only image.
     python -c "import torch; assert torch.version.cuda, 'torch is CPU-only: '+torch.__version__; print('[def] CUDA torch OK:', torch.__version__, 'cuda', torch.version.cuda)"
 
-    # ---- Simulation for evaluation (LIBERO) ----
-    # TODO(lerobot): confirm how to install LIBERO for v0.5.1. Unclear whether it
-    #                comes via a lerobot extra or a separate pip/repo, so left out.
-    # pip install --no-cache-dir libero  # <- name/availability unconfirmed, commented out
+    # ---- Pre-bake LIBERO config + assets for offline, non-interactive use ----
+    # LIBERO is installed above via lerobot[libero] (hf-libero), but its package
+    # __init__ has two runtime traps that must be defused at build time (the login
+    # node has internet; the compute nodes do NOT):
+    #   1. On first import, if config.yaml is missing, it calls input() to ask about a
+    #      custom dataset path — an interactive prompt that throws EOFError in a batch
+    #      job. It also does os.makedirs(~/.libero), which fails on the read-only image.
+    #   2. get_assets_path() downloads the mesh/scene assets from the Hub the first time
+    #      any env is built (~/.cache/libero/assets) — impossible offline.
+    # Fix both: pin LIBERO_CONFIG_PATH to a fixed in-image dir with a pre-written
+    # config.yaml (so runtime imports skip the makedirs AND the input()), and snapshot
+    # the asset repo into the package-local assets/ dir, which get_assets_path() returns
+    # directly when it exists (no network at runtime). Verified 2026-06-10.
+    export LIBERO_CONFIG_PATH=/opt/libero
+    mkdir -p "${LIBERO_CONFIG_PATH}"
+    # 'n' answers the "custom dataset path?" prompt; writes /opt/libero/config.yaml.
+    echo n | python -c "import libero.libero; print('[def] wrote', __import__('os').path.join('${LIBERO_CONFIG_PATH}','config.yaml'))"
+    HF_HUB_DISABLE_XET=1 python - <<'PY'
+import os
+from huggingface_hub import snapshot_download
+import libero.libero
+dest = os.path.join(os.path.dirname(libero.libero.__file__), "assets")
+snapshot_download(repo_id="lerobot/libero-assets", repo_type="dataset", local_dir=dest)
+# sanity: the dirs get_assets_path()/object loaders expect must now exist locally
+need = ["articulated_objects", "stable_scanned_objects", "turbosquid_objects", "stable_hope_objects"]
+missing = [d for d in need if not os.path.isdir(os.path.join(dest, d))]
+assert not missing, f"libero assets incomplete, missing: {missing}"
+print("[def] libero assets baked into", dest)
+PY
+
+    # ---- Force a single, headless OpenCV (drop the libxcb GUI dependency) ----
+    # lerobot pins opencv-python-headless; hf-libero/robosuite pin opencv-python. pip
+    # installs BOTH into the same cv2/ dir, and the non-headless build links libxcb.so.1
+    # (absent in this headless image) so `import cv2` -> ImportError, which kills the
+    # whole eval import chain (robosuite imports cv2). robosuite only needs cv2's API,
+    # not its GUI windows, so collapse to the headless build: purge every opencv variant
+    # AND the shared cv2/ dir (a half-removed dir otherwise breaks the reinstall), then
+    # install only headless. Verified 2026-06-10: cv2 then imports with no libxcb.
+    SP="$(python -c 'import lerobot, os; print(os.path.dirname(os.path.dirname(lerobot.__file__)))')"
+    pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python opencv-contrib-python-headless || true
+    rm -rf "${SP}/cv2" "${SP}"/opencv_python* "${SP}"/opencv_contrib*
+    pip install --no-cache-dir opencv-python-headless
+    python -c "import cv2; print('[def] cv2 headless', cv2.__version__)"
 
     # W&B / HF CLI (used by training and pre-download)
     pip install --no-cache-dir wandb "huggingface_hub[cli]"
 
-    # Notebook + plotting for 01_dataset/explore.ipynb
+    # Notebook + plotting for 02_imitation_learning/explore.ipynb
     pip install --no-cache-dir matplotlib jupyterlab
 
 %environment
     # In-container default. Actual offline control is exported by the PBS script.
     export PYTHONUNBUFFERED=1
+    # Point LIBERO at the in-image config baked in %post so imports are non-interactive
+    # and never try to write under a read-only HOME. Assets resolve from the package's
+    # own assets/ dir (also baked in %post), so no Hub access is needed at runtime.
+    export LIBERO_CONFIG_PATH=/opt/libero
 
 %runscript
     exec "$@"
@@ -99,3 +176,12 @@ PY
     # No GPU at build time, so assert the CUDA *build* is present (not availability).
     python -c "import torch; assert torch.version.cuda, 'CPU-only torch!'; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
     python -c "import lerobot; print('lerobot OK')"
+    # LIBERO must import non-interactively against the baked config (set it explicitly
+    # in case %test does not source %environment), and its assets must resolve LOCALLY
+    # with the Hub disabled — proving the eval works on the offline compute nodes.
+    export LIBERO_CONFIG_PATH=/opt/libero
+    HF_HUB_OFFLINE=1 python -c "from libero.libero import benchmark, get_libero_path, get_assets_path; import os; ap=get_assets_path(); assert os.path.isdir(os.path.join(ap,'turbosquid_objects')), 'libero assets not baked: '+ap; print('libero OK; assets', ap); print('suites', list(benchmark.get_benchmark_dict().keys())[:3])"
+    # cv2 must be the headless build (no libxcb), and libEGL must be present so MuJoCo's
+    # EGL renderer can load at runtime under --nv (actual rendering needs a GPU node).
+    python -c "import cv2; print('cv2', cv2.__version__)"
+    python -c "import ctypes.util; lib=ctypes.util.find_library('EGL'); assert lib, 'libEGL.so.1 missing from image'; print('libEGL OK:', lib)"

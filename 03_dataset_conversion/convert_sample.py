@@ -2,7 +2,7 @@
 # =============================================================================
 # convert_sample.py  —  convert raw episodes into a LeRobotDataset (v3.0)
 # -----------------------------------------------------------------------------
-# Reads the raw .npz episodes produced by tools/make_synthetic_dataset.py
+# Reads the raw .npz episodes produced by 03_dataset_conversion/make_synthetic_dataset.py
 # (--format raw) and builds a LeRobotDataset by defining features / fps /
 # robot_type and calling create -> add_frame -> save_episode -> finalize.
 # After writing, it reloads the dataset and asserts the shapes round-trip.
@@ -11,9 +11,9 @@
 # swap the .npz reader for your own raw source.
 #
 # Usage (offline, no GPU):
-#   python tools/make_synthetic_dataset.py --format raw --out .smoke/raw
-#   python 02_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted
-#   python 02_convert/convert_sample.py --raw .smoke/raw --root .smoke/converted --push  # to the Hub
+#   python 03_dataset_conversion/make_synthetic_dataset.py --format raw --out .smoke/raw
+#   python 03_dataset_conversion/convert_sample.py --raw .smoke/raw --root .smoke/converted
+#   python 03_dataset_conversion/convert_sample.py --raw .smoke/raw --root .smoke/converted --push  # to the Hub
 #
 # Verified with lerobot==0.5.1.
 # =============================================================================
@@ -46,7 +46,7 @@ def main():
     raw_dir = Path(args.raw)
     episode_files = sorted(raw_dir.glob("episode_*.npz"))
     if not episode_files:
-        raise SystemExit(f"ERROR: no episode_*.npz in {raw_dir}. Run tools/make_synthetic_dataset.py --format raw first.")
+        raise SystemExit(f"ERROR: no episode_*.npz in {raw_dir}. Run 03_dataset_conversion/make_synthetic_dataset.py --format raw first.")
     meta = read_meta(raw_dir)
 
     # --- repo_id (HF_USER required only when pushing: fail-fast) ---

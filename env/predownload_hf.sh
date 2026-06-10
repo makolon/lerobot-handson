@@ -26,14 +26,14 @@ export HF_HOME
 mkdir -p "${HF_HOME}"
 echo "[predl] HF_HOME = ${HF_HOME}"
 
-# huggingface-cli is included in the assumed v0.5.1 env. If missing: `pip install -U huggingface_hub`.
+# hf is included in the assumed v0.5.1 env. If missing: `pip install -U huggingface_hub`.
 # Pre-fetch the dataset (LeRobotDataset format)
 echo "[predl] dataset: ${DATA_REPO}"
-huggingface-cli download "${DATA_REPO}" --repo-type dataset
+hf download "${DATA_REPO}" --repo-type dataset
 
 # Pre-fetch the distributed checkpoint used for evaluation
 echo "[predl] ckpt   : ${CKPT_REPO}"
-huggingface-cli download "${CKPT_REPO}" --repo-type model
+hf download "${CKPT_REPO}" --repo-type model
 
 echo "[predl] done. Compute nodes can now run offline with HF_HUB_OFFLINE=1."
 echo "[predl] check size: du -sh ${HF_HOME}"

@@ -231,5 +231,8 @@ wandb/
 *.out
 *.err
 
-# smoke-test scratch output
+# Local scratch output (synthetic data / CPU rehearsal runs)
 .smoke/
+
+# Rendering-check output (05_policy_evaluation/rendering_check.py writes to CWD)
+libero_frame.png

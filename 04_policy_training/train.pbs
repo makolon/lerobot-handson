@@ -2,7 +2,7 @@
 # =============================================================================
 # train.pbs  —  PBS job that runs lerobot-train on a GH200 compute node
 # -----------------------------------------------------------------------------
-# Submit: source config.env && qsub 04_train/train.pbs
+# Submit: source config.env && qsub 04_policy_training/train.pbs
 #
 # Note: #PBS directives do not expand shell variables. So resource values are not
 #       hard-coded here; instead pass config.env values via -v at submit time, or
@@ -71,7 +71,7 @@ fi
 # --- run train.sh inside the container ---
 # --nv     : pass the GPU through
 # --bind   : make data / output / HF cache visible inside the container (important).
-#            Forgetting this causes FileNotFoundError (see challenges/debug/broken_03).
+#            Forgetting this causes FileNotFoundError inside the container.
 apptainer exec --nv \
   --home "${HF_HOME}" \
   --bind "${DATA_DIR}:${DATA_DIR}" \

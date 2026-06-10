@@ -10,7 +10,8 @@ so that **each time you run the event, in principle you only update `config.env`
 - Keep `env/apptainer.def`'s `From:` / install lines / `%labels` in sync with the same version.
 - Steps to bump the version:
   1. Check argument changes via `lerobot-train` / `lerobot-eval` `--help` for the new tag.
-  2. Re-run `make smoke` against the new version; fix any arg drift in the `*.sh` files.
+  2. Re-check arg drift in the `*.sh` files against the new version (rehearse
+     `train.sh` / `eval.sh` on CPU with the synthetic dataset).
   3. Resolve the `# TODO(lerobot)` spots in `env/apptainer.def` (NGC tag / extras / LIBERO).
   4. Update the tag/hash table in `README.md` and the `%labels` in `apptainer.def`.
   5. Rebuild the image and confirm at minimum that import and `--help` work.
@@ -33,28 +34,7 @@ git push origin --tags
   A two-layer design so people can catch up even without the tags.
 - For the Step ↔ directory mapping, see the table in `README.md`.
 
-## 3. `solutions` branch (the answers for Bonus 1)
-
-The **fixed versions** of the broken jobs (`challenges/debug/broken_*.pbs`) and the
-explanation (`challenges/debug/SOLUTIONS.md`) live **only on the `solutions` branch**.
-**Do not mix answers into `main`.**
-
-```bash
-# Create (first time)
-git switch -c solutions
-# Put the fixed versions + SOLUTIONS.md under challenges/debug/ and commit
-git push -u origin solutions
-
-# On the day: distribute main. For people who are stuck, point them to the
-# solutions branch or the Notion toggle.
-```
-
-- `main`'s `challenges/debug/README.md` only points to "the Notion toggle or the
-  solutions branch" (no answers written there).
-- When you bump the LeRobot version, update **both** `main`'s `broken_*.pbs` and the
-  `solutions` fixed versions.
-
-## 4. What to do each time you run the event (minimum)
+## 3. What to do each time you run the event (minimum)
 
 - [ ] Update the day-of info on Notion (queue names, billing number, W&B project/entity, data repo).
 - [ ] Tell participants to copy `config.env.example` → `config.env` and edit it (the repo is read-only).
@@ -62,7 +42,7 @@ git push -u origin solutions
       (`env/predownload_hf.sh`) are done in the shared area on the login node.
 - [ ] If needed, re-cut the `step-XX-start` tags at this round's HEAD.
 
-## 5. Unverified points (handover)
+## 4. Unverified points (handover)
 
 See the "Pre-event checklist" at the end of `README.md` and the `# TODO(miyabi)` /
 `# TODO(lerobot)` comments in each script. **Do not erase a TODO with a fabricated

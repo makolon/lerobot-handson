@@ -2,15 +2,15 @@
 # =============================================================================
 # make_synthetic_dataset.py  —  generate synthetic robot data, no net / no GPU
 # -----------------------------------------------------------------------------
-# Purpose: make the 01_dataset / 02_convert / 03_train exercises runnable without
-#          the HF Hub or Miyabi. Produces small dummy episodes of
+# Purpose: make the 02_imitation_learning / 03_dataset_conversion / 04_policy_training
+#          exercises runnable without the HF Hub or Miyabi. Produces small dummy episodes of
 #          observation.state / action / observation.images.front (+ a task string).
 #
 # Two output formats:
 #   --format lerobot  (default) : write a ready-to-load LeRobotDataset (v3.0) under --root.
-#                                 Used by 01_dataset (inspect) and 03_train (train on it).
+#                                 Used by 02_imitation_learning (inspect) and 04_policy_training (train on it).
 #   --format raw                : write raw per-episode .npz files under --out.
-#                                 Consumed by 02_convert/convert_sample.py to demonstrate
+#                                 Consumed by 03_dataset_conversion/convert_sample.py to demonstrate
 #                                 the create -> add_frame -> save_episode -> finalize flow.
 #
 # Runs on CPU with no network. Verified with lerobot==0.5.1.
@@ -25,7 +25,7 @@ import numpy as np
 def gen_episode(rng, length, state_dim, action_dim, hw):
     """Return (states, actions, images) for one synthetic episode.
 
-    The signals are smooth random walks so plots in 01_dataset look like a
+    The signals are smooth random walks so plots in 02_imitation_learning look like a
     trajectory rather than pure noise. Images are small random tiles.
     """
     h, w = hw
