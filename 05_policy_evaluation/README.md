@@ -8,8 +8,10 @@ training doesn't finish in time (it does not depend on training completion).
 
 ## Prerequisites
 
-- `config.env` has been `source`d (need `CKPT_REPO`, `APPTAINER_IMAGE`, `HF_HOME`, `OUTPUT_DIR`).
-- You pre-downloaded `CKPT_REPO` (the distributed checkpoint) with `env/predownload_hf.sh`.
+- `config.env` has been `source`d (sets `CKPT_REPO`, `APPTAINER_IMAGE`, `HF_HOME`, `OUTPUT_DIR`).
+- The distributed checkpoint (`CKPT_REPO`) is already in the shared `HF_HOME`, staged by
+  the organizer (see [`MAINTAINER.md`](../MAINTAINER.md) §3). Eval output goes to your
+  personal `OUTPUT_DIR`.
 - The container has the LIBERO eval dependencies (the `lerobot[libero]` extra in `env/apptainer.def`).
 
 ## Layout

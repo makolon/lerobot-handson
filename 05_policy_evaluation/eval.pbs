@@ -40,6 +40,7 @@ if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
 fi
 
 apptainer exec --nv \
+  --home "${OUTPUT_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
   --env HF_HUB_OFFLINE=1 \

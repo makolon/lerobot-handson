@@ -31,6 +31,22 @@ source config.env       # every script assumes these variables are set
 Each script **fails fast with a clear error** if a required environment variable is
 unset. Day-of values are never hard-coded in scripts; they all flow through `config.env`.
 
+## Storage on Miyabi (shared vs personal)
+
+Your personal quota is small (~24 GB), so nothing heavy is kept there. Everything lives
+under the group share `/work/gw13/share/handson` (`SHARED_DIR`), in two tiers:
+
+- **Shared, read-only** — staged once by the organizer, read by everyone:
+  the container image (`APPTAINER_IMAGE`), the LIBERO dataset (`LIBERO_ROOT`), the
+  ResNet18 backbone (`TORCH_HOME`), and the HF cache (`HF_HOME`). **You do not build the
+  image or download the dataset** — they are already there.
+- **Personal, writable** — `USER_DIR=${SHARED_DIR}/$USER`, created automatically when you
+  `source config.env`. Your checkpoints, eval output, and W&B runs go under
+  `OUTPUT_DIR=${USER_DIR}/outputs` — on the share, off your personal quota.
+
+So `source config.env` is all the setup you need; jobs read the shared data and write
+only into your own `USER_DIR`. (Maintainers: the one-time staging is in [`MAINTAINER.md`](./MAINTAINER.md) §3.)
+
 ## Rehearse the steps offline (no GPU, no network, no Miyabi)
 
 Every step's code (data → convert → train → eval) is plain Python/bash that runs

@@ -34,15 +34,59 @@ git push origin --tags
   A two-layer design so people can catch up even without the tags.
 - For the Step ↔ directory mapping, see the table in `README.md`.
 
-## 3. What to do each time you run the event (minimum)
+## 3. Shared storage layout (keep heavy data off the ~24 GB personal quota)
+
+Each participant has only ~24 GB of personal space — far too small for the 15 GB image
+or the ~33 GB LIBERO dataset. So everything heavy lives under the group share
+`/work/gw13/share/handson` (`SHARED_DIR`), in two tiers:
+
+```
+/work/gw13/share/handson/        SHARED_DIR — organizer stages ONCE, read by all
+├── images/lerobot-v0.5.1.sif    APPTAINER_IMAGE  (built once; nobody rebuilds)
+├── libero/                      LIBERO_ROOT      (~33 GB dataset, read-only)
+├── torch/                       TORCH_HOME       (ResNet18 backbone cache)
+├── hf_home/                     HF_HOME          (pre-downloaded repos, read)
+└── <username>/                  USER_DIR — each participant's WRITABLE area
+    └── outputs/                 OUTPUT_DIR       (checkpoints, eval, W&B)
+```
+
+`config.env` derives `USER_DIR=${SHARED_DIR}/${USER}` and `mkdir -p`s it, so each
+participant gets their own writable subdir just by `source config.env`. Compute jobs
+read the shared tier and write only under `USER_DIR` — their container `--home` is set
+to `OUTPUT_DIR`, because the shared `HF_HOME` is read-only for non-owners.
+
+### One-time setup (organizer, on the login node)
+
+```bash
+source config.env
+
+# 1. Make the share group-writable + sticky so participants can self-create USER_DIR
+#    (sticky bit: nobody can delete another person's subdir). Run as the share owner.
+chmod 3770 "${SHARED_DIR}"
+
+# 2. Build the image ONCE into the shared area (APPTAINER_IMAGE points there).
+bash env/build_image.sh
+
+# 3. Stage the shared LIBERO dataset + ResNet18 backbone (login node has internet).
+bash 04_policy_training/download_libero.sh
+
+# 4. Pre-download the eval checkpoint / generic dataset into the shared HF cache.
+bash env/predownload_hf.sh
+```
+
+Participants then only: clone the repo, `cp config.env.example config.env`, edit the
+day-of values, `source config.env` (which creates their `USER_DIR`), and submit jobs.
+They build **no** image and download **no** dataset.
+
+## 4. What to do each time you run the event (minimum)
 
 - [ ] Update the day-of info on Notion (queue names, billing number, W&B project/entity, data repo).
 - [ ] Tell participants to copy `config.env.example` → `config.env` and edit it (the repo is read-only).
-- [ ] Confirm the image build (`env/build_image.sh`) and HF pre-download
-      (`env/predownload_hf.sh`) are done in the shared area on the login node.
+- [ ] Do the one-time **shared setup** (section 3): `chmod` the share, build the image
+      into it, and stage the dataset / HF cache. Participants build/download nothing.
 - [ ] If needed, re-cut the `step-XX-start` tags at this round's HEAD.
 
-## 4. Unverified points (handover)
+## 5. Unverified points (handover)
 
 See the "Pre-event checklist" at the end of `README.md` and the `# TODO(miyabi)` /
 `# TODO(lerobot)` comments in each script. **Do not erase a TODO with a fabricated

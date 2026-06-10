@@ -72,8 +72,10 @@ fi
 # --nv     : pass the GPU through
 # --bind   : make data / output / HF cache visible inside the container (important).
 #            Forgetting this causes FileNotFoundError inside the container.
+# --home   : the container HOME must be WRITABLE. HF_HOME is the SHARED (read-only)
+#            cache, so HOME points at your personal OUTPUT_DIR instead.
 apptainer exec --nv \
-  --home "${HF_HOME}" \
+  --home "${OUTPUT_DIR}" \
   --bind "${DATA_DIR}:${DATA_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \

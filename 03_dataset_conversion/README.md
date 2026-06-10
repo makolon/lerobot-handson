@@ -11,9 +11,11 @@ into the `LeRobotDataset` v3.0 format. You define `features` (dtype/shape per ke
 
 - `config.env` has been `source`d (need `HF_USER` only if you `--push`) and the
   Apptainer module is loaded (`module load "$APPTAINER_MODULE"`).
-- `HF_HOME` exists on the host. The reload step makes `datasets` write a cache under
-  it, and apptainer's `--bind` needs the source path to exist first:
+- The reload step makes `datasets` write a cache under `HF_HOME`, but the **shared**
+  `HF_HOME` is read-only for you — so point it at your personal area for this exercise
+  (apptainer's `--bind` also needs the path to exist first):
   ```bash
+  export HF_HOME="${USER_DIR}/hf_home"
   mkdir -p "$HF_HOME"
   ```
 - Raw episodes to convert. Generate synthetic ones (no net/GPU), inside the container:

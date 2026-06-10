@@ -69,8 +69,10 @@ fi
 #            backbone cache must all be visible inside the container.
 # --env    : forward the paths so train_libero.sh resolves DATASET_ROOT and the
 #            offline/backbone settings the same way inside the container.
+# --home   : the container HOME must be WRITABLE. HF_HOME / LIBERO_ROOT are SHARED
+#            (read-only), so HOME points at your personal OUTPUT_DIR instead.
 apptainer exec --nv \
-  --home "${HF_HOME}" \
+  --home "${OUTPUT_DIR}" \
   --bind "${LIBERO_ROOT}:${LIBERO_ROOT}:ro" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \

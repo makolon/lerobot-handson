@@ -11,11 +11,11 @@ is a lightweight policy + few steps**. The design prioritizes the experience of
 
 ## Prerequisites
 
-- `config.env` has been `source`d (need `QUEUE_NAME`, `GROUP`, `APPTAINER_IMAGE`,
-  `DATA_REPO`, `HF_HOME`, `OUTPUT_DIR`, `WANDB_*`, etc.).
-- You built the image with `env/build_image.sh`.
-- You pre-downloaded `DATA_REPO` into the shared `HF_HOME` with `env/predownload_hf.sh`
-  (because compute nodes are offline).
+- `config.env` has been `source`d (sets `QUEUE_NAME`, `GROUP`, `APPTAINER_IMAGE`,
+  `DATA_REPO`, `HF_HOME`, `OUTPUT_DIR`, `WANDB_*`, … and creates your `USER_DIR`).
+- The shared image and dataset are already staged by the organizer (you build/download
+  nothing — see [`MAINTAINER.md`](../MAINTAINER.md) §3). Your checkpoints land under your
+  personal `OUTPUT_DIR=${USER_DIR}/outputs`, not your ~24 GB personal quota.
 
 ## Layout (the script is the source of truth)
 

@@ -139,7 +139,7 @@ GPU           --gpus (NVIDIA Container Toolkit)   --nv (binds the host driver)
 ```
    apptainer exec --nv  $APPTAINER_IMAGE  python train.py
                    │           │                 └─ your code + PyTorch + CUDA toolkit   ← from the .sif
-                   │           └─ the environment, one file on /work                     ← you built this
+                   │           └─ the environment, one file on /work                     ← prebuilt & shared
                    └─ "lend me the host node's GPU + driver"                             ← from the node
 ```
 
@@ -310,20 +310,24 @@ nvidia-smi    # your GH200 should appear
 exit          # leave the compute node when done looking around
 ```
 
-Step 5 — set up config and build the container image (back on the login node):
+Step 5 — set up your config (back on the login node):
 
 ```bash
 cd /work/gw13/$USER/lerobot-handson
 cp config.env.example config.env
 # Fill in config.env's day-of values (HF dataset/checkpoint repos, shared W&B
 # project/entity from the handout). Tokens are optional — only needed if you push.
-# For this warm-up you don't need any of those; the image is all it requires.
-source /work/gw13/$USER/lerobot-handson/config.env
-bash env/build_image.sh       # build the aarch64 Apptainer image (on the login node — it needs internet)
-echo "$APPTAINER_IMAGE"       # sanity check: a real .sif path, not empty
+# For this warm-up you don't need any of those.
+source config.env
+ls -lh "$APPTAINER_IMAGE"      # the SHARED image is already built — just confirm it's there
 ```
 
-`build_image.sh` loads the Apptainer module itself and pulls the NGC base, so it must run where there is internet — the **login node**. Compute nodes are offline.
+The container image is **shared**: the organizer built it once into the shared area, so
+you don't build a 15 GB image yourself — `source config.env` points `$APPTAINER_IMAGE` at
+it (and creates your personal output area under the share). Curious how it's made?
+`env/build_image.sh` bootstraps an NGC PyTorch base (aarch64) and installs LeRobot from
+`env/apptainer.def`; it must run on the **login node** because the build needs internet
+(compute nodes are offline).
 
 Step 6 — now do it the batch way (the real workflow). Submit the tiny warm-up job, watch it, read its log:
 
