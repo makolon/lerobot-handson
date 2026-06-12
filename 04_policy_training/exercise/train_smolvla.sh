@@ -43,8 +43,8 @@ export TRAIN_STEPS="${SMOLVLA_STEPS:-500}"
 export BATCH_SIZE="${SMOLVLA_BATCH:-4}"
 export JOB_NAME="${SMOLVLA_JOB_NAME:-smolvla_aloha}"
 
-# Dataset comes from the HF cache (downloaded on the login node), resolved by
-# repo_id with HF_HUB_OFFLINE=1 — so we deliberately do NOT set DATASET_ROOT.
+# Dataset comes from the HF cache (downloaded on the login node), resolved by repo_id
+# online (compute nodes have internet) — so we deliberately do NOT set DATASET_ROOT.
 unset DATASET_ROOT
 # SmolVLA brings its own pretrained weights via POLICY_PATH, so the ACT-only
 # ResNet18 backbone knob is irrelevant here.

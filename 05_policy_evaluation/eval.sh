@@ -38,7 +38,8 @@ set -euo pipefail
 #   POLICY_PATH="${OUTPUT_DIR}/${JOB_NAME}/checkpoints/last/pretrained_model"
 POLICY_PATH="${POLICY_PATH:-${CKPT_REPO:?set CKPT_REPO or POLICY_PATH}}"
 
-export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+# Compute nodes have internet; default ONLINE (set HF_HUB_OFFLINE=1 to force cache-only).
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
 
 # Headless GPU rendering for the LIBERO simulator. Miyabi sets CUDA_VISIBLE_DEVICES to
 # a GPU *UUID*, which robosuite's EGL device picker can't parse as an int; it prefers

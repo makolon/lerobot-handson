@@ -49,18 +49,19 @@ fi
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
 : "${HF_HOME:?HF_HOME unset}"
 
-# W&B runs OFFLINE on the compute node (no network). Runs are written to
-# $WANDB_DIR/wandb/offline-run-* and synced later from the login node.
-: "${WANDB_MODE:=offline}"
+# W&B logs LIVE (compute nodes have internet); train.sh falls back to offline if
+# WANDB_API_KEY is empty.
+: "${WANDB_MODE:=online}"
 : "${WANDB_DIR:=${OUTPUT_DIR}}"
 
-# HF_HOME must exist on the host: apptainer's --bind fails if the source path is missing.
-mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}"
+# Datasets cache must be WRITABLE (shared HF_HOME is read-only for non-owners).
+: "${HF_DATASETS_CACHE:=${OUTPUT_DIR}/hf_datasets}"
 
-# --- environment for the offline compute node ---
-# Compute nodes have no external network. HF uses only the pre-downloaded cache.
-export HF_HUB_OFFLINE=1
-export HF_HOME WANDB_MODE WANDB_DIR
+# Bind sources must exist on the host (apptainer --bind fails if missing).
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}" "${HF_DATASETS_CACHE}"
+
+# --- compute node has internet; pre-staged caches are for speed, not because offline ---
+export HF_HOME HF_DATASETS_CACHE WANDB_MODE WANDB_DIR WANDB_API_KEY
 
 # Apptainer module (if needed)
 # TODO(miyabi): confirm the Apptainer/Singularity module name
@@ -79,9 +80,11 @@ apptainer exec --nv \
   --bind "${DATA_DIR}:${DATA_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
-  --env HF_HUB_OFFLINE=1 \
+  --bind "${HF_DATASETS_CACHE}:${HF_DATASETS_CACHE}" \
   --env "HF_HOME=${HF_HOME}" \
+  --env "HF_DATASETS_CACHE=${HF_DATASETS_CACHE}" \
   --env "WANDB_MODE=${WANDB_MODE}" \
   --env "WANDB_DIR=${WANDB_DIR}" \
+  --env "WANDB_API_KEY=${WANDB_API_KEY:-}" \
   "${APPTAINER_IMAGE}" \
   bash 04_policy_training/train.sh

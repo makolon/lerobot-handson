@@ -79,16 +79,28 @@ fi
 [[ -n "${PRETRAINED_BACKBONE_WEIGHTS:-}" ]] && \
   ARGS+=( --policy.pretrained_backbone_weights="${PRETRAINED_BACKBONE_WEIGHTS}" )
 
-# W&B (shared). Enabled only when a project is configured.
+# W&B mode: compute nodes have internet, so runs log LIVE — but live logging needs an
+# API key in the job. If WANDB_MODE is online yet no key is set, fall back to offline so
+# the run still completes (sync it later with `wandb sync`).
+if [[ "${WANDB_MODE:-online}" == "online" && -z "${WANDB_API_KEY:-}" ]]; then
+  echo "[train] WANDB_API_KEY not set -> logging W&B OFFLINE (sync later)." >&2
+  export WANDB_MODE=offline
+fi
+export WANDB_MODE WANDB_DIR
+
+# W&B (shared). Enabled only when a project is configured. Pass --wandb.mode explicitly:
+# lerobot sends cfg.wandb.mode to wandb.init, which OVERRIDES the WANDB_MODE env var, so
+# the env alone would not make the offline fallback take effect.
 if [[ -n "${WANDB_PROJECT:-}" && "${WANDB_PROJECT}" != "<"* ]]; then
-  ARGS+=( --wandb.enable=true --wandb.project="${WANDB_PROJECT}" )
+  ARGS+=( --wandb.enable=true --wandb.project="${WANDB_PROJECT}" --wandb.mode="${WANDB_MODE:-online}" )
   [[ -n "${WANDB_ENTITY:-}" && "${WANDB_ENTITY}" != "<"* ]] && ARGS+=( --wandb.entity="${WANDB_ENTITY}" )
 else
   ARGS+=( --wandb.enable=false )
 fi
 
-# Compute nodes are offline; train.pbs exports this, re-assert for standalone runs.
-export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+# Compute nodes have internet; pre-staged caches are used for speed/reproducibility, not
+# because they are offline. Default to ONLINE; set HF_HUB_OFFLINE=1 to force cache-only.
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
 
 echo "[train] policy=${POLICY_DESC} dataset=${DATA_REPO} steps=${TRAIN_STEPS} batch=${BATCH_SIZE} device=${POLICY_DEVICE}"
 echo "[train] output=${OUTPUT_DIR}/${JOB_NAME}"

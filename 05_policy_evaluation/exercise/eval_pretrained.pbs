@@ -44,8 +44,7 @@ fi
 # HF_HOME must exist on the host: apptainer's --bind fails if the source is missing.
 mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
 
-# Offline compute node: only the pre-downloaded HF cache; headless GPU rendering.
-export HF_HUB_OFFLINE=1
+# Compute nodes have internet; pre-staged HF cache used for speed. Headless GPU rendering.
 export HF_HOME
 
 if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
@@ -56,7 +55,6 @@ apptainer exec --nv \
   --home "${OUTPUT_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
-  --env HF_HUB_OFFLINE=1 \
   --env "HF_HOME=${HF_HOME}" \
   --env "CKPT=${CKPT}" \
   --env "ENV_TYPE=${ENV_TYPE}" \

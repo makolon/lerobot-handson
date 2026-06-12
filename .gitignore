@@ -236,3 +236,6 @@ wandb/
 
 # Rendering-check output (05_policy_evaluation/rendering_check.py writes to CWD)
 libero_frame.png
+# Editor / slide-export backups (never commit)
+*.bak
+*.bak2

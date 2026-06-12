@@ -31,8 +31,7 @@ fi
 # HF_HOME must exist on the host: apptainer's --bind fails if the source path is missing.
 mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
 
-# Environment for the offline compute node
-export HF_HUB_OFFLINE=1
+# Compute nodes have internet; the pre-staged cache is used for speed/reproducibility.
 export HF_HOME
 
 if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
@@ -43,7 +42,6 @@ apptainer exec --nv \
   --home "${OUTPUT_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
-  --env HF_HUB_OFFLINE=1 \
   --env "HF_HOME=${HF_HOME}" \
   "${APPTAINER_IMAGE}" \
   bash 05_policy_evaluation/eval.sh

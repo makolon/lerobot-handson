@@ -3,8 +3,8 @@
 # render_check.pbs  —  validate headless LIBERO EGL rendering on a GH200 node
 # -----------------------------------------------------------------------------
 # Runs 05_policy_evaluation/rendering_check.py inside the container on a real GPU
-# (the login node has no GPU/EGL, so rendering can only be verified here). Offline:
-# LIBERO config + assets are baked into the image, so no Hub access is needed.
+# (the login node has no GPU/EGL, so rendering can only be verified here).
+# LIBERO config + assets are baked into the image, so no Hub access is needed at all.
 #
 # Submit (quick GPU queue, schedules fast):
 #   source config.env && qsub -q debug-g -W group_list="$GROUP" \
@@ -30,9 +30,8 @@ fi
 echo "[render_check] node: $(hostname); image: ${APPTAINER_IMAGE}"
 nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || echo "[render_check] WARN: nvidia-smi failed"
 
-# Offline; LIBERO_CONFIG_PATH/MUJOCO_GL come from the image %environment + the script.
+# LIBERO_CONFIG_PATH/MUJOCO_GL come from the image %environment + the script; no Hub needed.
 apptainer exec --nv \
-  --env HF_HUB_OFFLINE=1 \
   "${APPTAINER_IMAGE}" \
   python 05_policy_evaluation/rendering_check.py
 

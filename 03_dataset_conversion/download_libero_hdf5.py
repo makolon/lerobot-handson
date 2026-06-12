@@ -9,12 +9,19 @@
 #   The full repo is ~100 GB, so we fetch a SINGLE task file, not the whole thing.
 #
 # Usage (on the login node, inside the container):
-#   apptainer exec $APPTAINER_IMAGE python 03_dataset_conversion/download_libero_hdf5.py \
-#       --suite libero_object --dest "$SHARED_DIR/libero_raw"
+#   The --dest is OUTSIDE $PWD/$HOME, so it must be BOUND writable into the container
+#   (apptainer only auto-mounts $HOME, $PWD, /tmp). Pre-create it on the host, then
+#   bind $SHARED_DIR and point $HOME at a writable area (same hardening as the sibling
+#   download_*.sh wrappers):
 #
-#   # pick a specific task instead of the first one:
-#   apptainer exec $APPTAINER_IMAGE python 03_dataset_conversion/download_libero_hdf5.py \
-#       --suite libero_object --match alphabet_soup --dest "$SHARED_DIR/libero_raw"
+#   mkdir -p "$SHARED_DIR/libero_raw"
+#   apptainer exec \
+#       --home "$HF_HOME" --bind "$SHARED_DIR:$SHARED_DIR" --env HF_HUB_DISABLE_XET=1 \
+#       $APPTAINER_IMAGE \
+#       python 03_dataset_conversion/download_libero_hdf5.py \
+#         --suite libero_object --dest "$SHARED_DIR/libero_raw"
+#
+#   # pick a specific task instead of the first one:  add  --match alphabet_soup
 #
 # Then copy the printed path into config.env as LIBERO_TASK_HDF5.
 # =============================================================================

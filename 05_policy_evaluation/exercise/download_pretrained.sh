@@ -5,8 +5,8 @@
 # Run on the Miyabi [LOGIN NODE] (it has internet; compute nodes are offline).
 #
 # Downloads ONE pretrained policy checkpoint (a MODEL repo) into the shared HF
-# cache ($HF_HOME), so the offline compute node can evaluate it with
-# HF_HUB_OFFLINE=1.
+# cache ($HF_HOME), so every compute job evaluates the SAME pre-staged files
+# (faster + reproducible than each person re-downloading).
 #
 # Default: lerobot/act_aloha_sim_transfer_cube_human — an ACT policy on the ALOHA
 # sim env. Chosen because it actually LOADS in this image: it needs no extra

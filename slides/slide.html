@@ -995,7 +995,7 @@ apptainer exec $APPTAINER_IMAGE \
             └──── window ────┘   -&gt;  shape gains a leading T (=3)</code></pre></div><div style="display:contents" dir="auto"><p id="377c0dc8-0412-80de-a9bc-d58f52070f79" class="">We use the v3.0 dataset format (paired with lerobot 0.5.1).</p></div><div style="display:contents" dir="auto"><p id="377c0dc8-0412-80ac-8d05-cab6b70af65c" class="">Try it (reads the pre-downloaded cache in <code>HF_HOME</code>; no GPU needed):</p></div><div style="display:contents" dir="auto"><pre id="377c0dc8-0412-804c-896e-ea5569eb6b2a" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">apptainer exec $APPTAINER_IMAGE python - &lt;&lt;&#x27;PY&#x27;
 import os
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-ds = LeRobotDataset(os.environ[&quot;DATA_REPO&quot;])
+ds = LeRobotDataset(os.environ[&quot;DATA_REPO&quot;], root=os.environ[&quot;LIBERO_ROOT&quot;])
 print(&quot;fps:&quot;, ds.meta.fps, &quot;| episodes:&quot;, ds.num_episodes)
 for name, spec in ds.meta.features.items():
     print(f&quot;{name:28s} {spec[&#x27;dtype&#x27;]:8s} {tuple(spec[&#x27;shape&#x27;])}&quot;)
@@ -1049,7 +1049,7 @@ object. On the login node, inside the container (no GPU):
 apptainer exec $APPTAINER_IMAGE python - &lt;&lt;&#x27;PY&#x27;
 import os
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-ds = LeRobotDataset(os.environ[&quot;DATA_REPO&quot;])
+ds = LeRobotDataset(os.environ[&quot;DATA_REPO&quot;], root=os.environ[&quot;LIBERO_ROOT&quot;])
 print(&quot;fps:&quot;, ds.meta.fps, &quot;| episodes:&quot;, ds.num_episodes)
 for name, spec in ds.meta.features.items():
     print(f&quot;{name:28s} {spec[&#x27;dtype&#x27;]:8s} {tuple(spec[&#x27;shape&#x27;])}&quot;)
@@ -1319,11 +1319,9 @@ task: str, &quot;pick up the alphabet soup and place it in the basket&quot;</cod
    last/pretrained_model/   (Section 5 evaluates this)</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-80ae-87d8-c993975d9ffe" class="">Step 1 — get a GPU and enter the container</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80d8-9676-e9284d619b40" class="">Get an interactive GH200 and drop into the container. The GPU is yours for the session:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8012-aad3-fedd7c4b1a1e" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-apptainer shell --nv $APPTAINER_IMAGE</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-8046-bfc4-cf3ccec7e710" class="">Step 2 — run the baseline</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-805a-9058-cf4ec4eea59e" class="">Run one training job with default settings (chunk 50 / lr 1e-4 / batch 8 / obs 1 / aug off). The compute node has no internet, so we read the dataset locally and let W&amp;B log to disk for now:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8039-971b-eec5687aec15" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">export HF_HUB_OFFLINE=1  # read the pre-downloaded $DATA_REPO from $HF_HOME
-export WANDB_MODE=offline  # log locally now; sync from the login node later
-
-lerobot-train \
+apptainer shell --nv $APPTAINER_IMAGE</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-8046-bfc4-cf3ccec7e710" class="">Step 2 — run the baseline</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-805a-9058-cf4ec4eea59e" class="">Run one training job with default settings (chunk 50 / lr 1e-4 / batch 8 / obs 1 / aug off). The compute node has internet, but we read the dataset from the pre-staged local copy (fast, no re-download) and log to W&amp;B live:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8039-971b-eec5687aec15" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">lerobot-train \
   --dataset.repo_id=$DATA_REPO \
+  --dataset.root=$LIBERO_ROOT \
   --policy.type=act \
   --policy.chunk_size=50 \
   --policy.n_action_steps=50 \
@@ -1347,6 +1345,7 @@ lerobot-train \
                                           curbs overfitting; too strong hurts</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80c2-917a-db7df014b1f8" class="">For this run we keep <code>--policy.type=act</code>, <code>--dataset.repo_id=$DATA_REPO</code>, and <code>--steps=1000</code> fixed, and change the settings above to see their effect.</p></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-8063-a33d-ff49ebe27080" class="">Change <strong>one</strong> setting at a time and rerun. That way you can tell which setting moved the result. Same command as the baseline, with one flag swapped:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8093-8b05-da2516459876" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># smaller chunk
 lerobot-train \
   --dataset.repo_id=$DATA_REPO \
+  --dataset.root=$LIBERO_ROOT \
   --policy.type=act \
   --policy.chunk_size=20 \
   --policy.n_action_steps=20 \
@@ -1363,6 +1362,7 @@ lerobot-train \
 # higher learning rate
 lerobot-train \
   --dataset.repo_id=$DATA_REPO \
+  --dataset.root=$LIBERO_ROOT \
   --policy.type=act \
   --policy.chunk_size=50 \
   --policy.n_action_steps=50 \
@@ -1380,6 +1380,7 @@ lerobot-train \
 # image augmentation on, more history, bigger batch
 lerobot-train \
   --dataset.repo_id=$DATA_REPO \
+  --dataset.root=$LIBERO_ROOT \
   --policy.type=act \
   --policy.chunk_size=50 \
   --policy.n_action_steps=50 \
@@ -1392,7 +1393,7 @@ lerobot-train \
   --job_name=act_aug_obs2 \
   --wandb.enable=true \
   --wandb.project=$WANDB_PROJECT \
-  --policy.push_to_hub=false</code></pre></div><div style="display:contents" dir="auto"><blockquote id="37ac0dc8-0412-80e4-b4be-c45e233b1e8d" class="">ACT requires <code>n_action_steps ≤ chunk_size</code> (we set them equal). Flag names can differ between LeRobot versions — if one is rejected, run <code>lerobot-train --help</code> to confirm it.</blockquote></div><div style="display:contents" dir="auto"><h2 id="37ac0dc8-0412-80a7-82e6-f084364513c8" class="">View your runs in W&amp;B</h2></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80a7-8ea6-d06e2e459fa7" class="">The compute node could not reach wandb.ai, so the runs were logged offline. Sync them from the login node, which has internet:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-802f-8e11-e5459ea5678b" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">exit
+  --policy.push_to_hub=false</code></pre></div><div style="display:contents" dir="auto"><blockquote id="37ac0dc8-0412-80e4-b4be-c45e233b1e8d" class="">ACT requires <code>n_action_steps ≤ chunk_size</code> (we set them equal). Flag names can differ between LeRobot versions — if one is rejected, run <code>lerobot-train --help</code> to confirm it.</blockquote></div><div style="display:contents" dir="auto"><h2 id="37ac0dc8-0412-80a7-82e6-f084364513c8" class="">View your runs in W&amp;B</h2></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80a7-8ea6-d06e2e459fa7" class="">If you set WANDB_API_KEY, your runs streamed to W&amp;B live — just open the project. If you ran without a key (the offline fallback), upload them from anywhere:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-802f-8e11-e5459ea5678b" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">exit
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
 apptainer exec $APPTAINER_IMAGE wandb sync --sync-all</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-8098-b9c9-d37f079007f2" class="">Open <code>$WANDB_PROJECT</code> in the browser and look at the <code>train/loss</code> curve for each run. The run names (<code>act_base</code>, <code>act_cs20</code>, <code>act_lr3e4</code>, …) tell you which setting each one used, so you can compare them side by side.</p></div><div style="display:contents" dir="auto"><h2 id="37ac0dc8-0412-80d9-800c-deeef200a5ce" class="">Exercise — Train SmolVLA on an ALOHA Sim dataset (~20 min.)</h2></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-8006-ab19-ef1fb583f4ab" class="">Work through these in order. Try each one yourself first, then open the Answers to check. Everything uses only the commands from this block.</p></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80a4-bf93-c7767d274a0a" class=""><strong>Setup:</strong> you have the repo cloned and <code>config.env</code> sourced. Your group is <code>gw13</code>. The login node has internet; the compute node does not.</p></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-8012-b442-cd9feb86679e" class="toggle"><li><details open=""><summary>Questions</summary><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-809e-929c-e5294349ab52" class="bulleted-list"><li style="list-style-type:disc">Q1. Pick and download a dataset<div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-80b0-b6e8-dbbab12aa25a" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">Browse the LeRobot datasets on the Hub and download an ALOHA Sim dataset yourself.
 
@@ -1417,8 +1418,6 @@ apptainer exec $APPTAINER_IMAGE huggingface-cli download lerobot/smolvla_base</c
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
 apptainer shell --nv $APPTAINER_IMAGE  # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801f-8c74-c2812391d792" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
-export HF_HUB_OFFLINE=1        # use the files you downloaded on the login node
-export WANDB_MODE=offline
 export DATASET=lerobot/aloha_sim_insertion_human
 
 lerobot-train \
@@ -1519,22 +1518,21 @@ The checkpoint and the environment must match — a LIBERO policy cannot run on 
 †If the interactive queue is busy you may wait for the GPU. A small --eval.n_episodes (e.g. 10) is enough to see a number.</code></pre></div></li></ul></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-805c-9160-dc1530e8df7d" class="toggle"><li><details open=""><summary>Answers</summary><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80a9-87eb-c2d1ebf1bd01" class="bulleted-list"><li style="list-style-type:disc"><strong>A1.</strong> Pick any checkpoint and note the env it needs. Three good options:<div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-80e7-8bbd-f1e7393f31c7" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">lerobot/diffusion_pusht                     --env.type=pusht
 lerobot/act_aloha_sim_transfer_cube_human   --env.type=aloha  --env.task=AlohaTransferCube-v0
 lerobot/pi0_libero_finetuned                --env.type=libero --env.task=libero_object</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-8055-86a6-fe8d6471cdfc" class="">How to tell: the model card lists the training dataset and env, and the<br/>downloaded <code>config.json</code> records the input/output features. Download on the<br/>login node, which has internet:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8077-aadf-da6c7974d8b4" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-export CKPT=lerobot/pi0_libero_finetuned     # the one you picked
+export CKPT=lerobot/act_aloha_sim_transfer_cube_human   # picked (ACT+aloha loads in this image)
 
 apptainer exec $APPTAINER_IMAGE huggingface-cli download $CKPT</code></pre></div></li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-8046-b764-ce73adb818ed" class="bulleted-list"><li style="list-style-type:disc"><strong>A2.</strong> Get an interactive GPU, enter the container, and evaluate:<div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8013-bcef-ed5dd713f4e8" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
 apptainer shell --nv $APPTAINER_IMAGE      # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801d-9bfe-f236e957a58c" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
-export HF_HUB_OFFLINE=1        # use the checkpoint you downloaded on the login node
 export MUJOCO_GL=egl           # headless rendering for the simulator
-export CKPT=lerobot/pi0_libero_finetuned
+export CKPT=lerobot/act_aloha_sim_transfer_cube_human
 
 lerobot-eval \
   --policy.path=$CKPT \
   --policy.device=cuda \
-  --env.type=libero --env.task=libero_object \
+  --env.type=aloha --env.task=AlohaTransferCube-v0 \
   --eval.n_episodes=10 --eval.batch_size=10 \
-  --output_dir=$OUTPUT_DIR/eval_pi0_libero</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80f4-8c7a-dce9284fdb2e" class="">You are done when <code>lerobot-eval</code> prints the average success rate (0–1) and<br/>writes rollout videos under:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-80f7-a083-c0b036dec0ae" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">$OUTPUT_DIR/eval_pi0_libero/</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80dd-aecf-ea44738ef47a" class="">Notes:</p></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-806b-a3a9-dee5a020b5b5" class="bulleted-list"><li style="list-style-type:circle">Match the policy to the env. For an ALOHA checkpoint:<br/><code>-env.type=aloha --env.task=AlohaTransferCube-v0</code> (or <code>AlohaInsertion-v0</code>).<br/>For PushT: <code>-env.type=pusht</code> (add <code>-policy.use_amp=false</code>).</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80fb-be0c-ed1d88a0ced2" class="bulleted-list"><li style="list-style-type:circle">To evaluate your own Section 4 run instead of a Hub model, point <code>-policy.path</code><br/>at a local checkpoint: <code>$OUTPUT_DIR/&lt;run&gt;/checkpoints/last/pretrained_model</code>.</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-801d-b5d0-f54a1600967f" class="bulleted-list"><li style="list-style-type:circle">The simulator renders headless, so set <code>MUJOCO_GL=egl</code> (config.env may<br/>already do this).</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80d2-aaec-e63c1523838c" class="bulleted-list"><li style="list-style-type:circle">The sim env may need an extra (<code>gym-pusht</code> / <code>gym-aloha</code>, or the LIBERO<br/>env). If the env fails to load, the container is missing it.</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-8035-aa6c-c9f503fdc73c" class="bulleted-list"><li style="list-style-type:circle"><code>-eval.n_episodes</code> small (10) keeps it quick; raise it for a more reliable<br/>number.</li></ul></div></li></ul></div></details></li></ul></div><div style="display:contents" dir="auto"><hr id="376c0dc8-0412-805c-bfec-f9e30cf367df"/></div><div style="display:contents" dir="auto"><h1 id="377c0dc8-0412-80b5-9925-efffc1f6ab3e" class="">6. Wrap-up &amp; what&#x27;s next</h1></div><div style="display:contents" dir="auto"><h2 id="37bc0dc8-0412-8068-8606-eabbe19fc594" class="">Recap — what you can do now ☁️</h2></div><div style="display:contents" dir="auto"><p id="37bc0dc8-0412-800e-8ce7-c74cf663de26" class="">In 105 minutes you ran the whole middle of the robot-learning pipeline yourself, on a real GH200.</p></div><div style="display:contents" dir="auto"><pre id="37bc0dc8-0412-80bf-832c-e9d169baca0f" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all"> Data ──────────▶ Convert ──────────▶ Train ──────────▶ Evaluate
+  --output_dir=$OUTPUT_DIR/eval_act_aloha</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80f4-8c7a-dce9284fdb2e" class="">You are done when <code>lerobot-eval</code> prints the average success rate (0–1) and<br/>writes rollout videos under:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-80f7-a083-c0b036dec0ae" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all">$OUTPUT_DIR/eval_pi0_libero/</code></pre></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80dd-aecf-ea44738ef47a" class="">Notes:</p></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-806b-a3a9-dee5a020b5b5" class="bulleted-list"><li style="list-style-type:circle">Match the policy to the env. For an ALOHA checkpoint:<br/><code>-env.type=aloha --env.task=AlohaTransferCube-v0</code> (or <code>AlohaInsertion-v0</code>).<br/>For PushT: <code>-env.type=pusht</code> (add <code>-policy.use_amp=false</code>).</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80fb-be0c-ed1d88a0ced2" class="bulleted-list"><li style="list-style-type:circle">To evaluate your own Section 4 run instead of a Hub model, point <code>-policy.path</code><br/>at a local checkpoint: <code>$OUTPUT_DIR/&lt;run&gt;/checkpoints/last/pretrained_model</code>.</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-801d-b5d0-f54a1600967f" class="bulleted-list"><li style="list-style-type:circle">The simulator renders headless, so set <code>MUJOCO_GL=egl</code> (config.env may<br/>already do this).</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80d2-aaec-e63c1523838c" class="bulleted-list"><li style="list-style-type:circle">The sim env may need an extra (<code>gym-pusht</code> / <code>gym-aloha</code>, or the LIBERO<br/>env). If the env fails to load, the container is missing it.</li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-8035-aa6c-c9f503fdc73c" class="bulleted-list"><li style="list-style-type:circle"><code>-eval.n_episodes</code> small (10) keeps it quick; raise it for a more reliable<br/>number.</li></ul></div></li></ul></div></details></li></ul></div><div style="display:contents" dir="auto"><hr id="376c0dc8-0412-805c-bfec-f9e30cf367df"/></div><div style="display:contents" dir="auto"><h1 id="377c0dc8-0412-80b5-9925-efffc1f6ab3e" class="">6. Wrap-up &amp; what&#x27;s next</h1></div><div style="display:contents" dir="auto"><h2 id="37bc0dc8-0412-8068-8606-eabbe19fc594" class="">Recap — what you can do now ☁️</h2></div><div style="display:contents" dir="auto"><p id="37bc0dc8-0412-800e-8ce7-c74cf663de26" class="">In 105 minutes you ran the whole middle of the robot-learning pipeline yourself, on a real GH200.</p></div><div style="display:contents" dir="auto"><pre id="37bc0dc8-0412-80bf-832c-e9d169baca0f" class="code code-wrap"><code style="white-space:pre-wrap;word-break:break-all"> Data ──────────▶ Convert ──────────▶ Train ──────────▶ Evaluate
    │                  │                  │                  │
  inspect a        raw -&gt; one         one ACT            success rate
  raw dataset      standard           job on             in the LIBERO
