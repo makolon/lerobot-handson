@@ -47,15 +47,20 @@ export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
 
+EVAL_OUT="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")"
+
 ARGS=(
   --policy.path="${POLICY_PATH}"
   --env.type=libero
   --env.task="${ENV_TASK}"
+  --env.video=true                 # save a rollout mp4 per episode (watch successes & failures)
   --eval.n_episodes="${EVAL_EPISODES}"
   --eval.batch_size="${EVAL_BATCH_SIZE}"
-  --output_dir="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")"
+  --output_dir="${EVAL_OUT}"
   --policy.device="${POLICY_DEVICE}"
 )
+# Optional: cap the rollout video length in frames (default records the full episode).
+[[ -n "${EVAL_VIDEO_LENGTH:-}" ]] && ARGS+=( --env.video_length="${EVAL_VIDEO_LENGTH}" )
 
 echo "[eval] policy=${POLICY_PATH} env=libero task=${ENV_TASK} episodes=${EVAL_EPISODES}"
 echo "[eval] lerobot-eval ${ARGS[*]}"
@@ -67,4 +72,5 @@ fi
 
 lerobot-eval "${ARGS[@]}"
 
-echo "[eval] done. See the output dir / log for the success rate and videos."
+echo "[eval] done. success rate -> the log + ${EVAL_OUT}/eval_info.json"
+echo "[eval] rollout videos (one mp4 per episode) -> ${EVAL_OUT}/videos/"

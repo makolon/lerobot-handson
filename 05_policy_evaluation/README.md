@@ -54,7 +54,8 @@ defaults the batch size to the episode count.
 ## Expected output (self-check cues, real run)
 
 - The log shows per-episode success/failure and a final **success rate** (e.g. `0.6`).
-- Eval videos/rollouts are written under `OUTPUT_DIR` (depending on config).
+- A rollout **video per episode** is written under `$OUTPUT_DIR/eval_*/videos/<task>/eval_episode_*.mp4`
+  (`eval.sh` passes `--env.video=true`); `eval_info.json` lists every `video_path`.
 - Eval metrics are recorded in the shared W&B (same project as the training run).
 
 If something goes wrong:

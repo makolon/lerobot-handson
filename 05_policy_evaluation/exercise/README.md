@@ -122,8 +122,14 @@ qstat                                  # Q -> R -> done
 cat eval_pretrained.o<jobid>           # read THIS job by id
 ```
 
-You are done when `lerobot-eval` prints the average success rate (0–1) and writes rollout
-videos under `$OUTPUT_DIR/eval_<checkpoint>/`.
+You are done when `lerobot-eval` prints the average success rate (0–1). It also saves a
+**rollout video per episode** (the scripts pass `--env.video=true`):
+
+```
+$OUTPUT_DIR/eval_<checkpoint>/
+  eval_info.json          # per-episode success + the video_paths
+  videos/<task>/eval_episode_*.mp4   # one mp4 per episode — watch a success AND a failure
+```
 
 ### Notes
 
