@@ -123,7 +123,7 @@ cat eval_pretrained.o<jobid>           # read THIS job by id
 ```
 
 You are done when `lerobot-eval` prints the average success rate (0–1). It also saves a
-**rollout video per episode** (the scripts pass `--env.video=true`):
+**rollout video per episode** (up to 10, recorded by default):
 
 ```
 $OUTPUT_DIR/eval_<checkpoint>/

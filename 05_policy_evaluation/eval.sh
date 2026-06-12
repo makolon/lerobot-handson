@@ -33,6 +33,20 @@ set -euo pipefail
 : "${ENV_TASK:=libero_object}"
 : "${POLICY_DEVICE:=cuda}"
 
+# This wrapper is driven by ENV VARS (see header), NOT by lerobot-eval flags. As a
+# convenience it accepts a lerobot-style --policy.path=DIR (mapped to POLICY_PATH so the
+# output dir is derived correctly); any other argument is rejected rather than silently
+# ignored (which previously let a stale POLICY_PATH win over what you typed).
+for a in "$@"; do
+  case "$a" in
+    --policy.path=*) POLICY_PATH="${a#--policy.path=}" ;;
+    *) echo "ERROR: unrecognized argument: $a" >&2
+       echo "  Set inputs via env vars (POLICY_PATH=... OUTPUT_DIR=... etc; see header)" >&2
+       echo "  or pass --policy.path=DIR. This wrapper does not forward other lerobot-eval flags." >&2
+       exit 2 ;;
+  esac
+done
+
 # Checkpoint to evaluate. Default is the distributed repo (CKPT_REPO).
 # To evaluate your own training output, set:
 #   POLICY_PATH="${OUTPUT_DIR}/${JOB_NAME}/checkpoints/last/pretrained_model"
@@ -53,14 +67,13 @@ ARGS=(
   --policy.path="${POLICY_PATH}"
   --env.type=libero
   --env.task="${ENV_TASK}"
-  --env.video=true                 # save a rollout mp4 per episode (watch successes & failures)
   --eval.n_episodes="${EVAL_EPISODES}"
   --eval.batch_size="${EVAL_BATCH_SIZE}"
   --output_dir="${EVAL_OUT}"
   --policy.device="${POLICY_DEVICE}"
 )
-# Optional: cap the rollout video length in frames (default records the full episode).
-[[ -n "${EVAL_VIDEO_LENGTH:-}" ]] && ARGS+=( --env.video_length="${EVAL_VIDEO_LENGTH}" )
+# lerobot-eval always records a rollout mp4 per episode (up to 10) under
+# ${EVAL_OUT}/videos/ — there is no CLI flag to toggle it in lerobot 0.5.1.
 
 echo "[eval] policy=${POLICY_PATH} env=libero task=${ENV_TASK} episodes=${EVAL_EPISODES}"
 echo "[eval] lerobot-eval ${ARGS[*]}"
@@ -73,4 +86,4 @@ fi
 lerobot-eval "${ARGS[@]}"
 
 echo "[eval] done. success rate -> the log + ${EVAL_OUT}/eval_info.json"
-echo "[eval] rollout videos (one mp4 per episode) -> ${EVAL_OUT}/videos/"
+echo "[eval] rollout videos (one mp4 per episode, up to 10) -> ${EVAL_OUT}/videos/"
