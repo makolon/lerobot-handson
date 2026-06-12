@@ -79,6 +79,11 @@ fi
 [[ -n "${PRETRAINED_BACKBONE_WEIGHTS:-}" ]] && \
   ARGS+=( --policy.pretrained_backbone_weights="${PRETRAINED_BACKBONE_WEIGHTS}" )
 
+# Extra raw flags appended verbatim (space-separated), e.g. SmolVLA's
+# "--policy.load_vlm_weights=true". Word-split on purpose (values have no spaces).
+# shellcheck disable=SC2206
+[[ -n "${EXTRA_ARGS:-}" ]] && ARGS+=( ${EXTRA_ARGS} )
+
 # W&B mode: compute nodes have internet, so runs log LIVE — but live logging needs an
 # API key in the job. If WANDB_MODE is online yet no key is set, fall back to offline so
 # the run still completes (sync it later with `wandb sync`).

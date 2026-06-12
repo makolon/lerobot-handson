@@ -239,3 +239,7 @@ libero_frame.png
 # Editor / slide-export backups (never commit)
 *.bak
 *.bak2
+
+# PBS job stdout/err logs
+*.o[0-9]*
+*.e[0-9]*

@@ -37,21 +37,35 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Force the values ../train.sh consumes, from SMOLVLA_* overrides (NOT the generic
 # config.env names, which leak in via Apptainer's env passthrough).
 export DATA_REPO="${SMOLVLA_DATASET:-lerobot/aloha_sim_insertion_human}"
-export POLICY_PATH="${SMOLVLA_BASE:-lerobot/smolvla_base}"   # fine-tune FROM this
-export POLICY_DTYPE="${SMOLVLA_DTYPE:-bfloat16}"
+export POLICY_TYPE="smolvla"          # train SmolVLA (see note on why NOT --policy.path)
 export TRAIN_STEPS="${SMOLVLA_STEPS:-500}"
 export BATCH_SIZE="${SMOLVLA_BATCH:-4}"
 export JOB_NAME="${SMOLVLA_JOB_NAME:-smolvla_aloha}"
 
-# Dataset comes from the HF cache (downloaded on the login node), resolved by repo_id
-# online (compute nodes have internet) — so we deliberately do NOT set DATASET_ROOT.
-unset DATASET_ROOT
-# SmolVLA brings its own pretrained weights via POLICY_PATH, so the ACT-only
-# ResNet18 backbone knob is irrelevant here.
-unset PRETRAINED_BACKBONE_WEIGHTS
+# Why --policy.type=smolvla (+ load the pretrained VLM) and NOT --policy.path=smolvla_base:
+#   smolvla_base's saved config hard-codes 3 cameras (camera1/2/3). An ALOHA dataset has a
+#   single 'top' camera, so --policy.path=lerobot/smolvla_base errors with a feature
+#   mismatch. --policy.type=smolvla derives the input features FROM THE DATASET and loads
+#   the pretrained SmolVLM2 vision-language backbone (load_vlm_weights=true) while training
+#   a fresh action expert — so it trains end-to-end on any dataset's camera layout.
+export EXTRA_ARGS="--policy.load_vlm_weights=true ${EXTRA_ARGS:-}"
+unset POLICY_PATH
 
-echo "[train_smolvla] dataset    : ${DATA_REPO}  (from HF cache)"
-echo "[train_smolvla] fine-tune  : ${POLICY_PATH}  dtype=${POLICY_DTYPE}"
+# num2words (a SmolVLM-processor dependency) is staged in the shared pylibs dir rather than
+# baked into the image; put it on PYTHONPATH. (Rebuild with lerobot[...,smolvla] to drop this.)
+export PYTHONPATH="${SMOLVLA_PYLIBS:-${SHARED_DIR:-/work/gw13/share/handson}/pylibs}:${PYTHONPATH:-}"
+
+# Dataset is resolved by repo_id from the HF cache (compute nodes have internet) — so we
+# deliberately do NOT set DATASET_ROOT. ResNet backbone knob is ACT-only, so clear it.
+unset DATASET_ROOT
+unset PRETRAINED_BACKBONE_WEIGHTS
+# SmolVLAConfig has no `dtype` field (unlike ACT), so DON'T pass --policy.dtype (draccus
+# rejects it). On a GH200 (96 GB) fp32 fits fine here; SmolVLA manages its backbone precision.
+unset POLICY_DTYPE
+
+echo "[train_smolvla] dataset : ${DATA_REPO}  (from HF cache)"
+echo "[train_smolvla] policy  : smolvla (pretrained SmolVLM2 backbone + fresh action expert)"
+echo "[train_smolvla] pylibs  : ${PYTHONPATH%%:*}  (num2words)"
 
 # Hand off to the shared training body (one dir up).
 exec bash "${HERE}/../train.sh"

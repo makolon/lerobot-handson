@@ -49,8 +49,13 @@ fi
 # cache + locks; the shared HF_HOME is read-only for non-owners.
 : "${HF_DATASETS_CACHE:=${OUTPUT_DIR}/hf_datasets}"
 
+# SmolVLA needs num2words (a SmolVLM-processor dep) which is staged in the shared pylibs
+# dir and put on PYTHONPATH by train_smolvla.sh; it must be bound into the container.
+: "${SHARED_DIR:=/work/gw13/share/handson}"
+: "${SMOLVLA_PYLIBS:=${SHARED_DIR}/pylibs}"
+
 # Bind sources must exist on the host (apptainer --bind fails otherwise).
-mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}" "${HF_DATASETS_CACHE}"
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}" "${WANDB_DIR}" "${HF_DATASETS_CACHE}" "${SMOLVLA_PYLIBS}"
 
 # --- compute node has internet; pre-staged HF cache is for speed, not because offline ---
 export HF_HOME HF_DATASETS_CACHE WANDB_MODE WANDB_DIR WANDB_API_KEY
@@ -69,8 +74,10 @@ apptainer exec --nv \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   --bind "${HF_HOME}:${HF_HOME}" \
   --bind "${HF_DATASETS_CACHE}:${HF_DATASETS_CACHE}" \
+  --bind "${SMOLVLA_PYLIBS}:${SMOLVLA_PYLIBS}" \
   --env "HF_HOME=${HF_HOME}" \
   --env "HF_DATASETS_CACHE=${HF_DATASETS_CACHE}" \
+  --env "SMOLVLA_PYLIBS=${SMOLVLA_PYLIBS}" \
   --env "WANDB_MODE=${WANDB_MODE}" \
   --env "WANDB_DIR=${WANDB_DIR}" \
   --env "WANDB_API_KEY=${WANDB_API_KEY:-}" \

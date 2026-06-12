@@ -12,7 +12,7 @@ The login node has internet; the compute node does not.
 > | File | Role |
 > |------|------|
 > | [`download_aloha_sim.sh`](./download_aloha_sim.sh) | **login node**: download the ALOHA Sim dataset + `lerobot/smolvla_base` into `$HF_HOME`, warm-load the dataset (Q1) |
-> | [`train_smolvla.sh`](./train_smolvla.sh) | SmolVLA config layer over [`../train.sh`](../train.sh) — sets `--policy.path=lerobot/smolvla_base`, `--policy.dtype=bfloat16`, small batch (Q2) |
+> | [`train_smolvla.sh`](./train_smolvla.sh) | SmolVLA config layer over [`../train.sh`](../train.sh) — sets `--policy.type=smolvla` + `load_vlm_weights`, puts num2words on `PYTHONPATH`, small batch (Q2) |
 > | [`train_smolvla.pbs`](./train_smolvla.pbs) | batch PBS wrapper (the interactive answer's submit-and-walk-away equivalent) |
 >
 > `train_smolvla.sh` does **not** re-implement the training command — it forces
@@ -76,26 +76,24 @@ SMOLVLA_DATASET=lerobot/aloha_sim_insertion_human \
 
 ### A2. Fine-tune SmolVLA
 
-**Interactive** — get a GPU, enter the container, and fine-tune:
+**Interactive** — get a GPU, enter the container **with the writable bind**, and train:
 
 ```bash
 qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson && source config.env
-apptainer shell --nv $APPTAINER_IMAGE  # now inside the container, on the GPU
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE   # bind => outputs/caches writable
 ```
 
 ```bash
-# inside the container, on the GPU
-export HF_HUB_OFFLINE=1        # use the files you downloaded on the login node
-export WANDB_MODE=offline
+# inside the container, on the GPU. PYTHONPATH adds num2words (staged in the share).
+# Do NOT set HF_HUB_OFFLINE — compute nodes have internet.
 export DATASET=lerobot/aloha_sim_insertion_human
 
-lerobot-train \
+PYTHONPATH=$SHARED_DIR/pylibs lerobot-train \
   --dataset.repo_id=$DATASET \
-  --policy.path=lerobot/smolvla_base \
+  --policy.type=smolvla --policy.load_vlm_weights=true \
   --policy.device=cuda \
-  --policy.dtype=bfloat16 \
   --batch_size=4 \
   --steps=500 \
   --output_dir=$OUTPUT_DIR/smolvla_aloha --job_name=smolvla_aloha \
@@ -129,10 +127,16 @@ $OUTPUT_DIR/smolvla_aloha/checkpoints/last/pretrained_model/
 
 ### Notes
 
-- `--policy.path=lerobot/smolvla_base` fine-tunes the pretrained SmolVLA. (To train
-  from scratch instead: `--policy.type=smolvla --policy.load_vlm_weights=true`.)
-- Unlike ACT, SmolVLA reads the `task` instruction — it is a VLA, so the dataset's
-  language field is used.
-- SmolVLA is larger than ACT; keep `--batch_size` small (4) to stay within memory.
-- If `lerobot/smolvla_base` fails to load, the container may be missing SmolVLA's extra
-  dependencies (`lerobot[smolvla]`).
+- **Why `--policy.type=smolvla --policy.load_vlm_weights=true`, not
+  `--policy.path=lerobot/smolvla_base`:** smolvla_base's saved config hard-codes 3 cameras
+  (`camera1/2/3`); an ALOHA dataset has a single `top` camera, so `--policy.path` errors with a
+  *feature mismatch*. `--policy.type=smolvla` derives the input features **from the dataset** and
+  loads the pretrained SmolVLM2 backbone (`load_vlm_weights=true`) while training a fresh action
+  expert — so it trains on any camera layout. (`train_smolvla.sh` does this for you.)
+- **`num2words`** (a SmolVLM-processor dependency) is not baked into the image; it is staged in
+  `$SHARED_DIR/pylibs` and added via `PYTHONPATH`. Rebuilding the image with
+  `lerobot[aloha,libero,smolvla]` would bake it in and drop the `PYTHONPATH`.
+- Do **not** pass `--policy.dtype` for SmolVLA — its config has no `dtype` field (draccus rejects
+  it). fp32 fits fine on a GH200's 96 GB for this exercise.
+- Unlike ACT, SmolVLA reads the `task` instruction — the dataset's language field is used.
+- SmolVLA is larger than ACT; keep `--batch_size` small (4).

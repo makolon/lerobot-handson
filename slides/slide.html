@@ -1319,7 +1319,7 @@ task: str, &quot;pick up the alphabet soup and place it in the basket&quot;</cod
    last/pretrained_model/   (Section 5 evaluates this)</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-80ae-87d8-c993975d9ffe" class="">Step 1 — get a GPU and enter the container</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-80d8-9676-e9284d619b40" class="">Get an interactive GH200 and drop into the container. The GPU is yours for the session:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8012-aad3-fedd7c4b1a1e" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-apptainer shell --nv $APPTAINER_IMAGE</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-8046-bfc4-cf3ccec7e710" class="">Step 2 — run the baseline</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-805a-9058-cf4ec4eea59e" class="">Run one training job with default settings (chunk 50 / lr 1e-4 / batch 8 / obs 1 / aug off). The compute node has internet, but we read the dataset from the pre-staged local copy (fast, no re-download) and log to W&amp;B live:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8039-971b-eec5687aec15" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">lerobot-train \
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE</code></pre></div><div style="display:contents" dir="auto"><h3 id="37ac0dc8-0412-8046-bfc4-cf3ccec7e710" class="">Step 2 — run the baseline</h3></div><div style="display:contents" dir="auto"><p id="37ac0dc8-0412-805a-9058-cf4ec4eea59e" class="">Run one training job with default settings (chunk 50 / lr 1e-4 / batch 8 / obs 1 / aug off). The compute node has internet, but we read the dataset from the pre-staged local copy (fast, no re-download) and log to W&amp;B live:</p></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8039-971b-eec5687aec15" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">lerobot-train \
   --dataset.repo_id=$DATA_REPO \
   --dataset.root=$LIBERO_ROOT \
   --policy.type=act \
@@ -1417,14 +1417,13 @@ apptainer exec $APPTAINER_IMAGE huggingface-cli download --repo-type dataset $DA
 apptainer exec $APPTAINER_IMAGE huggingface-cli download lerobot/smolvla_base</code></pre></div></li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-80e2-adef-ecb4440e6a3b" class="bulleted-list"><li style="list-style-type:disc"><strong>A2.</strong> Get an interactive GPU, enter the container, and fine-tune:<div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8014-b28b-f0b5b0827faa" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-apptainer shell --nv $APPTAINER_IMAGE  # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801f-8c74-c2812391d792" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE  # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801f-8c74-c2812391d792" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
 export DATASET=lerobot/aloha_sim_insertion_human
 
-lerobot-train \
+PYTHONPATH=$SHARED_DIR/pylibs lerobot-train \
   --dataset.repo_id=$DATASET \
-  --policy.path=lerobot/smolvla_base \
+  --policy.type=smolvla --policy.load_vlm_weights=true \
   --policy.device=cuda \
-  --policy.dtype=bfloat16 \
   --batch_size=4 \
   --steps=500 \
   --output_dir=$OUTPUT_DIR/smolvla_aloha --job_name=smolvla_aloha \
@@ -1483,7 +1482,7 @@ env.close()</code></pre></div></details></li></ul></div><div style="display:cont
 # saved libero_frame.png (256, 256, 3)</code></pre></div><div style="display:contents" dir="auto"><p id="37bc0dc8-0412-80a9-a95a-edf3f0af7d9c" class="">Open <code>libero_frame.png</code>. You should see the LIBERO tabletop scene from the agent-view camera. That single image confirms the whole rendering path works: <code>--nv</code> reached the GPU, <code>MUJOCO_GL=egl</code> rendered offscreen, and the env and its assets loaded from the image.</p></div><div style="display:contents" dir="auto"><blockquote id="37bc0dc8-0412-8096-91a6-ffbe15984a15" class="">If you instead see <code>libEGL ... failed to create dri2 screen</code> or a black image, rendering is the problem, not your policy. Check that you ran with <code>--nv</code>, that <code>MUJOCO_GL=egl</code> is set, and that you are on a GPU node (not the login node).</blockquote></div><div style="display:contents" dir="auto"><h2 id="379c0dc8-0412-8037-b473-c649f1881015" class="">Run the evaluation</h2></div><div style="display:contents" dir="auto"><p id="379c0dc8-0412-80e8-86b2-d2b6cde17064" class="">Step 1 — on an interactive GH200, in the container, set the render backend:</p></div><div style="display:contents" dir="auto"><pre id="379c0dc8-0412-80a6-a8c1-d3c76a5b306e" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=00:30:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-apptainer shell --nv $APPTAINER_IMAGE
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE
 export MUJOCO_GL=egl  # headless GPU rendering for MuJoCo</code></pre></div><div style="display:contents" dir="auto"><p id="379c0dc8-0412-803b-9771-c0a0aca4b5d4" class="">Step 2 — evaluate the checkpoint you trained. <code>05_policy_evaluation/eval.sh</code> wraps the command for you:</p></div><div style="display:contents" dir="auto"><pre id="379c0dc8-0412-80ff-be9e-cfdd52585e1d" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">bash 05_policy_evaluation/eval.sh --policy.path=$OUTPUT_DIR/act_base/checkpoints/last/pretrained_model</code></pre></div><div style="display:contents" dir="auto"><p id="379c0dc8-0412-807e-9348-e0d8813d2139" class="">which runs:</p></div><div style="display:contents" dir="auto"><pre id="379c0dc8-0412-80e3-95a1-eb69b3475799" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">lerobot-eval \
   --policy.path=$OUTPUT_DIR/act_base/checkpoints/last/pretrained_model \
   --env.type=libero \
@@ -1523,7 +1522,7 @@ export CKPT=lerobot/act_aloha_sim_transfer_cube_human   # picked (ACT+aloha load
 apptainer exec $APPTAINER_IMAGE huggingface-cli download $CKPT</code></pre></div></li></ul></div><div style="display:contents" dir="auto"><ul id="37ac0dc8-0412-8046-b764-ce73adb818ed" class="bulleted-list"><li style="list-style-type:disc"><strong>A2.</strong> Get an interactive GPU, enter the container, and evaluate:<div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-8013-bcef-ed5dd713f4e8" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all">qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson &amp;&amp; source config.env
-apptainer shell --nv $APPTAINER_IMAGE      # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801d-9bfe-f236e957a58c" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE      # now inside the container, on the GPU</code></pre></div><div style="display:contents" dir="auto"><pre id="37ac0dc8-0412-801d-9bfe-f236e957a58c" class="code code-wrap"><code class="language-bash" style="white-space:pre-wrap;word-break:break-all"># inside the container, on the GPU
 export MUJOCO_GL=egl           # headless rendering for the simulator
 export CKPT=lerobot/act_aloha_sim_transfer_cube_human
 
