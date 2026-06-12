@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # =============================================================================
-# env/download_libero_hdf5.py
+# 03_dataset_conversion/download_libero_hdf5.py
 #   Download ONE raw LIBERO task .hdf5 (robomimic/robosuite format) into the
 #   shared area. Run on the Miyabi [login node] — it has internet. Compute nodes
 #   are offline, so we stage the file once here and everyone reads it offline.
@@ -9,11 +9,11 @@
 #   The full repo is ~100 GB, so we fetch a SINGLE task file, not the whole thing.
 #
 # Usage (on the login node, inside the container):
-#   apptainer exec $APPTAINER_IMAGE python env/download_libero_hdf5.py \
+#   apptainer exec $APPTAINER_IMAGE python 03_dataset_conversion/download_libero_hdf5.py \
 #       --suite libero_object --dest "$SHARED_DIR/libero_raw"
 #
 #   # pick a specific task instead of the first one:
-#   apptainer exec $APPTAINER_IMAGE python env/download_libero_hdf5.py \
+#   apptainer exec $APPTAINER_IMAGE python 03_dataset_conversion/download_libero_hdf5.py \
 #       --suite libero_object --match alphabet_soup --dest "$SHARED_DIR/libero_raw"
 #
 # Then copy the printed path into config.env as LIBERO_TASK_HDF5.

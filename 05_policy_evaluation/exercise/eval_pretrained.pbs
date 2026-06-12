@@ -1,0 +1,67 @@
+#!/bin/bash
+# =============================================================================
+# eval_pretrained.pbs  —  ANSWER to Exercise Q2 (batch variant)
+# -----------------------------------------------------------------------------
+# Evaluate a pretrained checkpoint in its simulator on a GH200 node, offline.
+# The exercise text drives this interactively (qsub -I + apptainer shell); this
+# PBS wrapper is the submit-and-walk-away equivalent, matching ../eval.pbs. Both
+# run the SAME eval_pretrained.sh body.
+#
+# Prereq: download_pretrained.sh cached $CKPT into $HF_HOME on the login node.
+#
+# Submit from the repo root (resources passed at submit time, like eval.pbs):
+#   source config.env
+#   CKPT=lerobot/act_aloha_sim_transfer_cube_human \
+#   qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 \
+#        -l walltime="$WALLTIME" \
+#        -v CKPT,ENV_TYPE,ENV_TASK 05_policy_evaluation/exercise/eval_pretrained.pbs
+# (Miyabi rejects -V; -v forwards only the named vars. Or edit the defaults below.)
+#
+# Miyabi PBS: project via -W group_list=<GROUP> (NOT -P); -l select=1 = one GH200.
+# =============================================================================
+
+#PBS -N eval_pretrained
+#PBS -j oe
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+
+if [[ -f config.env ]]; then
+  # shellcheck disable=SC1091
+  source config.env
+fi
+
+# --- fail-fast ---
+: "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
+: "${OUTPUT_DIR:?OUTPUT_DIR unset}"
+: "${HF_HOME:?HF_HOME unset}"
+
+# Checkpoint + env (override via -v at submit time, or edit here).
+: "${CKPT:=lerobot/act_aloha_sim_transfer_cube_human}"
+: "${ENV_TYPE:=aloha}"
+: "${ENV_TASK:=AlohaTransferCube-v0}"
+
+# HF_HOME must exist on the host: apptainer's --bind fails if the source is missing.
+mkdir -p "${OUTPUT_DIR}" "${HF_HOME}"
+
+# Offline compute node: only the pre-downloaded HF cache; headless GPU rendering.
+export HF_HUB_OFFLINE=1
+export HF_HOME
+
+if [[ -n "${APPTAINER_MODULE:-}" && "${APPTAINER_MODULE}" != "<"* ]]; then
+  module load "${APPTAINER_MODULE}"
+fi
+
+apptainer exec --nv \
+  --home "${OUTPUT_DIR}" \
+  --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \
+  --bind "${HF_HOME}:${HF_HOME}" \
+  --env HF_HUB_OFFLINE=1 \
+  --env "HF_HOME=${HF_HOME}" \
+  --env "CKPT=${CKPT}" \
+  --env "ENV_TYPE=${ENV_TYPE}" \
+  --env "ENV_TASK=${ENV_TASK}" \
+  --env "MUJOCO_GL=egl" \
+  --env "MUJOCO_EGL_DEVICE_ID=0" \
+  "${APPTAINER_IMAGE}" \
+  bash 05_policy_evaluation/exercise/eval_pretrained.sh
