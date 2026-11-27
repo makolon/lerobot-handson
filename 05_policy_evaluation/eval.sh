@@ -22,6 +22,7 @@
 #   EVAL_BATCH_SIZE           parallel envs                (default = EVAL_EPISODES)
 #   ENV_TASK                  libero task name             (default libero_object)
 #   POLICY_DEVICE             cuda | cpu                   (default cuda)
+#   EVAL_OUT                  output dir                   (default $OUTPUT_DIR/eval/<run name>)
 #   DRY_RUN                   1 = print the command, don't run
 # =============================================================================
 set -euo pipefail
@@ -61,7 +62,21 @@ export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-0}"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 export MUJOCO_EGL_DEVICE_ID="${MUJOCO_EGL_DEVICE_ID:-0}"
 
-EVAL_OUT="${OUTPUT_DIR}/eval_$(basename "${POLICY_PATH}")"
+# Output dir, named after the RUN — not after the last path component, which is
+# "pretrained_model" for every local checkpoint (so all runs used to overwrite one dir):
+#   $OUTPUT_DIR/act_base/checkpoints/last/pretrained_model   -> $OUTPUT_DIR/eval/act_base
+#   $OUTPUT_DIR/act_base/checkpoints/000500/pretrained_model -> $OUTPUT_DIR/eval/act_base_000500
+#   lerobot/act_aloha_sim_transfer_cube_human                -> $OUTPUT_DIR/eval/act_aloha_sim_transfer_cube_human
+# Set EVAL_OUT to override.
+_ckpt="${POLICY_PATH%/}"
+if [[ "$(basename "${_ckpt}")" == "pretrained_model" ]]; then
+  _step="$(basename "$(dirname "${_ckpt}")")"
+  _run="$(basename "$(dirname "$(dirname "$(dirname "${_ckpt}")")")")"
+  if [[ "${_step}" != "last" ]]; then _run="${_run}_${_step}"; fi
+else
+  _run="$(basename "${_ckpt}")"
+fi
+EVAL_OUT="${EVAL_OUT:-${OUTPUT_DIR}/eval/${_run}}"
 
 ARGS=(
   --policy.path="${POLICY_PATH}"
@@ -72,8 +87,8 @@ ARGS=(
   --output_dir="${EVAL_OUT}"
   --policy.device="${POLICY_DEVICE}"
 )
-# lerobot-eval always records a rollout mp4 per episode (up to 10) under
-# ${EVAL_OUT}/videos/ — there is no CLI flag to toggle it in lerobot 0.5.1.
+# lerobot-eval always records rollout mp4s (up to 10 per task) under
+# ${EVAL_OUT}/videos/<task_group>_<task_id>/ — there is no CLI flag to toggle it in lerobot 0.5.1.
 
 echo "[eval] policy=${POLICY_PATH} env=libero task=${ENV_TASK} episodes=${EVAL_EPISODES}"
 echo "[eval] lerobot-eval ${ARGS[*]}"
@@ -86,4 +101,4 @@ fi
 lerobot-eval "${ARGS[@]}"
 
 echo "[eval] done. success rate -> the log + ${EVAL_OUT}/eval_info.json"
-echo "[eval] rollout videos (one mp4 per episode, up to 10) -> ${EVAL_OUT}/videos/"
+echo "[eval] rollout videos (up to 10 per task) -> ${EVAL_OUT}/videos/"

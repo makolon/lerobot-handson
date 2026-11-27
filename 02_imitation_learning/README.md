@@ -8,8 +8,10 @@ Hub and check observation/action shapes, fps, and camera images with your own ey
 
 ## Prerequisites
 
-- On Miyabi: `source config.env` (need `DATA_REPO`, `HF_HOME`) and pre-download
-  `DATA_REPO` with `env/predownload_hf.sh` so it reads offline via `HF_HUB_OFFLINE=1`.
+- On Miyabi: `source config.env` (need `DATA_REPO`, `LIBERO_ROOT`). The organizer staged
+  `DATA_REPO` once as a plain folder at `$LIBERO_ROOT`; the notebook reads it from there
+  (LeRobot reads a local root or its own cache, not the generic Hub cache). Inside the
+  container, bind the share: `apptainer exec --bind "$SHARED_DIR" ...`.
 - Offline/standalone (laptop): build the synthetic dataset and point the notebook at it:
   ```bash
   python 03_dataset_conversion/make_synthetic_dataset.py --format lerobot --root .smoke/synthetic
@@ -53,5 +55,6 @@ shape relationships are the same.
 
 If it doesn't work:
 
-- `HF_HUB_OFFLINE`-related errors → check pre-download (`env/predownload_hf.sh`) is done
-  and `HF_HOME` points at the same shared area used during pre-download.
+- It tries to download / `Read-only file system` → the dataset was loaded without a local
+  root. Check `LIBERO_ROOT` is set (or `LEROBOT_DATASET_ROOT`) and that the container was
+  started with `--bind "$SHARED_DIR"` (only `$PWD`/`$HOME` are mounted automatically).

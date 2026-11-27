@@ -77,10 +77,13 @@ branch) is in [`MAINTAINER.md`](./MAINTAINER.md).
 
 ## Design assumptions (specific to this hands-on)
 
-- **GH200 = aarch64**. Compute nodes are **offline**. Python dependencies assume the
-  NGC aarch64 PyTorch container (Apptainer). HF assets are pre-downloaded on the login
-  node, and compute jobs use `HF_HUB_OFFLINE=1` with an `HF_HOME` pointing at shared
-  storage (see [`env/`](./env/)).
+- **GH200 = aarch64**. Compute nodes **have internet** (verified 2026-06-08). Python
+  dependencies assume the NGC aarch64 PyTorch container (Apptainer). The organizer
+  pre-stages the big shared assets once (LIBERO dataset in `$LIBERO_ROOT`, ResNet18 in
+  `$TORCH_HOME`, image) so every job reads the same files; the shared `HF_HOME` is
+  read-only for participants, who download into `$USER_HF_HOME` (see [`env/`](./env/)).
+- Only `$PWD` and `$HOME` are mounted into the container automatically: anything else
+  under `/work` needs `apptainer exec --bind "$SHARED_DIR" ...`.
 - The scheduler is assumed to be **PBS-family** (`qsub`/`qstat`/`qdel`). **However the
   exact Miyabi-specific specs are unverified** (see the checklist below).
 - Everyone just clones the same read-only repository. Result sharing is done via a
@@ -106,4 +109,4 @@ scripts carry `# TODO(miyabi)` / `# TODO(lerobot)` comments.
 - [ ] **HF pre-download size** — actual size of the dataset/checkpoint vs. free space in the `HF_HOME` shared area
 - [ ] **Apptainer build resolves the extras** — `lerobot[aloha]` + matplotlib/jupyter install on aarch64 (CLI args themselves are already verified against 0.5.1 by the smoke test)
 - [ ] **LIBERO simulation dependencies** — the extras / env vars needed for `lerobot-eval` are available on the compute node (the eval *command* is verified; only the LIBERO sim run is not)
-- [ ] **Shared W&B offline behavior** — if the compute node is offline, whether `WANDB_MODE=offline` + a later sync is required
+- [x] **Shared W&B behavior** — compute nodes have internet, so runs log live; without `WANDB_API_KEY` the scripts fall back to `--wandb.mode=offline` (sync later with `wandb sync $OUTPUT_DIR/<run>/wandb/offline-run-*`)

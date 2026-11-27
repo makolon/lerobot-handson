@@ -5,18 +5,19 @@
 #   object — fps, number of episodes, and every feature's dtype/shape — then
 #   point out which keys are camera images and what the action dimension is.
 #
-# Runs on the login node, inside the container — no GPU, no job needed.
+# Runs inside the container (interactive session or login node) — light, no GPU.
+# Only $PWD/$HOME are mounted automatically, so bind the share for $LIBERO_ROOT.
 #
 # Usage:
 #   source config.env
-#   apptainer exec $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py
+#   apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py
 #
 #   # or inspect a specific repo / local root instead of $DATA_REPO:
-#   apptainer exec $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py \
+#   apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py \
 #       --repo-id HuggingFaceVLA/libero --root "$LIBERO_ROOT"
 #
-# Reads the pre-downloaded cache in $HF_HOME (set HF_HUB_OFFLINE=1 on the compute
-# node); on the login node it can also download on demand.
+# For $DATA_REPO it reads the pre-staged local copy in $LIBERO_ROOT by default (LeRobot
+# does not read the generic Hub cache; without a root it would try to re-download).
 # =============================================================================
 import argparse
 import os
@@ -27,11 +28,14 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--repo-id", default=os.environ.get("DATA_REPO"),
                 help="dataset repo_id (default: $DATA_REPO)")
 ap.add_argument("--root", default=os.environ.get("LEROBOT_DATASET_ROOT"),
-                help="optional local dataset dir (e.g. $LIBERO_ROOT) -> reads offline")
+                help="local dataset dir (default: $LIBERO_ROOT when reading $DATA_REPO)")
 args = ap.parse_args()
 
 if not args.repo_id:
     raise SystemExit("set --repo-id or $DATA_REPO (source config.env first)")
+# $DATA_REPO is staged as a plain folder ($LIBERO_ROOT): read it from there.
+if args.root is None and args.repo_id == os.environ.get("DATA_REPO") and os.environ.get("LIBERO_ROOT"):
+    args.root = os.environ["LIBERO_ROOT"]
 
 # --- 1. load + the headline numbers ----------------------------------------
 ds = LeRobotDataset(args.repo_id, root=args.root) if args.root \

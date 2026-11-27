@@ -9,13 +9,14 @@
 # Called from: exercise/train_smolvla.pbs (via apptainer exec) on Miyabi, OR run
 #              directly inside an interactive container session.
 # Prereq:      exercise/download_aloha_sim.sh has cached the dataset + the
-#              lerobot/smolvla_base model into $HF_HOME on the login node.
+#              SmolVLM2 backbone into $USER_HF_HOME on the login node.
 #
 # Key differences from ACT (train_libero.sh):
-#   - fine-tunes a pretrained checkpoint: POLICY_PATH=lerobot/smolvla_base
-#     (NOT --policy.type; ../train.sh switches on POLICY_PATH being set)
+#   - starts from the pretrained SmolVLM2 backbone (--policy.type=smolvla +
+#     --policy.load_vlm_weights=true) and trains a new action expert — NOT
+#     --policy.path=lerobot/smolvla_base (see the note below for why)
 #   - SmolVLA is a VLA and reads the dataset's `task` language field
-#   - larger than ACT -> small batch (4) + bfloat16 to fit memory
+#   - larger than ACT -> small batch (4)
 #   - dataset is resolved by repo_id from the HF cache (no DATASET_ROOT)
 #
 # NOTE on overrides: config.env exports generic defaults (TRAIN_STEPS, BATCH_SIZE,
@@ -23,8 +24,6 @@
 # inheriting those, this script uses dedicated SMOLVLA_* vars and *forces* the
 # values it hands to ../train.sh. Override:
 #   SMOLVLA_DATASET   dataset repo_id   (default lerobot/aloha_sim_insertion_human)
-#   SMOLVLA_BASE      base checkpoint   (default lerobot/smolvla_base) -> --policy.path
-#   SMOLVLA_DTYPE     compute dtype     (default bfloat16)
 #   SMOLVLA_STEPS     train steps       (default 500 — a short "does it train?" run)
 #   SMOLVLA_BATCH     batch size        (default 4 — SmolVLA is big; keep it small)
 #   SMOLVLA_JOB_NAME  run/output name   (default smolvla_aloha)
@@ -54,6 +53,10 @@ unset POLICY_PATH
 # num2words (a SmolVLM-processor dependency) is staged in the shared pylibs dir rather than
 # baked into the image; put it on PYTHONPATH. (Rebuild with lerobot[...,smolvla] to drop this.)
 export PYTHONPATH="${SMOLVLA_PYLIBS:-${SHARED_DIR:-/work/gw13/share/handson}/pylibs}:${PYTHONPATH:-}"
+
+# Read the dataset + backbone from YOUR cache, where download_aloha_sim.sh put them
+# (the shared HF_HOME is read-only for participants).
+if [[ -n "${USER_HF_HOME:-}" ]]; then export HF_HOME="${USER_HF_HOME}"; fi
 
 # Dataset is resolved by repo_id from the HF cache (compute nodes have internet) — so we
 # deliberately do NOT set DATASET_ROOT. ResNet backbone knob is ACT-only, so clear it.

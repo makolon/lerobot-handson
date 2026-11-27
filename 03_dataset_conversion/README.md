@@ -31,21 +31,20 @@ into the `LeRobotDataset` v3.0 format. You define `features` (dtype/shape per ke
   then **reloads and asserts** the shapes round-trip.
   - Default is local save. `--push` pushes to a repo under `HF_USER` (optional, needs net).
 
-Run it inside the container. The `--bind`/`--env HF_HOME` flags mirror what
-`04_policy_training/train.pbs` and `05_policy_evaluation/eval.pbs` do: only `$PWD` is auto-mounted, so
-`$HF_HOME` (outside `$PWD`) must be bound explicitly or the reload step fails with
-`Read-only file system: .../hf_home`.
+Run it inside the container. Only `$PWD` and `$HOME` are auto-mounted, so the share —
+which holds your personal `$HF_HOME` and `$HF_DATASETS_CACHE` — must be bound explicitly
+(`--bind "$SHARED_DIR"`), or the reload step fails with `Read-only file system`.
 
 ```bash
 # Build locally (offline)
 apptainer exec \
-  --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" \
+  --bind "$SHARED_DIR" --env "HF_HOME=$HF_HOME" \
   "$APPTAINER_IMAGE" \
   python 03_dataset_conversion/convert_sample.py --raw .smoke/raw --root .smoke/converted
 
 # Push to the Hub (requires HF_USER, needs network, run on the login node)
 apptainer exec \
-  --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" \
+  --bind "$SHARED_DIR" --env "HF_HOME=$HF_HOME" \
   "$APPTAINER_IMAGE" \
   python 03_dataset_conversion/convert_sample.py --raw .smoke/raw --root .smoke/converted --push
 ```

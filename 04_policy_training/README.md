@@ -32,7 +32,7 @@ qsub 04_policy_training/train.pbs        # submit the job
 qstat                          # check status (see cheatsheet/)
 ```
 
-Logs go to the PBS stdout/stderr (`*.out` / `*.err`).
+The log goes to `lerobot_train.o<jobid>` (the job name + id; `-j oe` merges stdout and stderr).
 
 ## Expected output (self-check cues)
 
@@ -60,23 +60,24 @@ DATA_REPO=handson/synthetic DATASET_ROOT=.smoke/synthetic OUTPUT_DIR=.smoke/outp
   bash 04_policy_training/train.sh
 ```
 
-If something goes wrong, the usual suspects are OOM (lower `BATCH_SIZE`), a missing
-`HF_HUB_OFFLINE=1`/`HF_HOME`, a forgotten `--bind`, or a wrong queue name.
+If something goes wrong, the usual suspects are OOM (lower `BATCH_SIZE`), a dataset loaded
+without `--dataset.root=$LIBERO_ROOT` (it then tries to re-download into the read-only
+share), a forgotten `--bind`, or a wrong queue name.
 
 ## Train ACT on the shared LIBERO dataset
 
 A concrete end-to-end recipe: download the LeRobot LIBERO dataset
 ([`HuggingFaceVLA/libero`](https://huggingface.co/datasets/HuggingFaceVLA/libero) —
 all suites, dual-camera + 8-D state + 7-D action) into the **shared** area once, then
-train ACT from it offline. Everyone reuses the one shared copy.
+train ACT from it. Everyone reuses the one shared copy.
 
 | File | Role |
 |------|------|
 | [`download_libero.sh`](./download_libero.sh) | **login node**: download the dataset into `/work/gw13/share/handson/libero`, warm-load it (caches any format conversion), and pre-cache the ACT ResNet18 ImageNet backbone into `/work/gw13/share/handson/torch` |
 | [`train_libero.sh`](./train_libero.sh) | LIBERO config layer over `train.sh` — sets `--policy.type=act`, `--dataset.root=$LIBERO_ROOT`, sensible steps/batch |
-| [`train_libero.pbs`](./train_libero.pbs) | PBS wrapper: binds the shared dataset (read-only) + backbone cache, runs `train_libero.sh` offline on a GH200 |
+| [`train_libero.pbs`](./train_libero.pbs) | PBS wrapper: binds the shared dataset (read-only) + backbone cache, runs `train_libero.sh` on a GH200 |
 
-### 1. Download into the share (login node, has internet)
+### 1. Download into the share (organizer, once, login node)
 
 ```bash
 source config.env                       # need APPTAINER_IMAGE / APPTAINER_MODULE
@@ -85,10 +86,10 @@ bash 04_policy_training/download_libero.sh
 # -> /work/gw13/share/handson/torch    (ResNet18 backbone cache)
 ```
 
-Compute nodes are offline, so this **must** run on the login node. It pulls the
-dataset and the backbone once; later jobs read both from the share.
+The organizer runs this once. It pulls the dataset and the backbone into the share
+(read-only for participants); every later job reads both from there.
 
-### 2. Train ACT offline (GH200 compute node)
+### 2. Train ACT (GH200 compute node)
 
 ```bash
 source config.env
@@ -106,11 +107,11 @@ and (if `WANDB_*` is configured) a loss curve appears in the shared W&B.
 `export LIBERO_...=...` lines to `config.env`, which the job sources): `LIBERO_STEPS`
 (default 50000), `LIBERO_BATCH` (default 32 — a GH200's ~96 GB can go higher),
 `LIBERO_JOB_NAME`, `LIBERO_ROOT` (dataset path), `LIBERO_REPO`. To skip the ImageNet
-backbone entirely (random init, fully offline-safe without step 1's pre-cache),
+backbone entirely (random init, no pre-cache needed),
 add `PRETRAINED_BACKBONE_WEIGHTS=null`.
 
 > The eval module ([`05_policy_evaluation`](../05_policy_evaluation/)) defaults to
 > `--env.type=libero --env.task=libero_object`, so an ACT policy trained here is the
 > matching thing to evaluate. Note in-sim eval needs the LIBERO simulator
-> (`MUJOCO_GL=egl`), whose aarch64 deps are still unconfirmed — training itself does
+> (`MUJOCO_GL=egl`, plus `MUJOCO_EGL_DEVICE_ID=0` on Miyabi) — training itself does
 > not need the simulator.

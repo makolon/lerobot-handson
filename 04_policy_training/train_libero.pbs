@@ -47,7 +47,7 @@ if [[ ! -d "${LIBERO_ROOT}" ]]; then
 fi
 
 # W&B logs LIVE (compute nodes have internet). Live logging needs WANDB_API_KEY in the
-# job; train.sh falls back to offline (-> $WANDB_DIR/wandb/offline-run-*) if it is empty.
+# job; train.sh falls back to offline (-> $OUTPUT_DIR/<run>/wandb/offline-run-*) if it is empty.
 : "${WANDB_MODE:=online}"
 : "${WANDB_DIR:=${OUTPUT_DIR}}"
 

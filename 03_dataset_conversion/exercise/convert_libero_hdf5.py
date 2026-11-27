@@ -39,8 +39,10 @@ ds = LeRobotDataset.create(
 for name in demos:                       # demo_0, demo_1, ...
     g = data[name]
     obs = g["obs"]
-    agent = obs["agentview_rgb"][()][:, ::-1]      # flip upside-down render
-    wrist = obs["eye_in_hand_rgb"][()][:, ::-1]
+    # robosuite renders upside-down; rotate 180° (flip H and W), the convention of
+    # HuggingFaceVLA/libero and of LeRobot's LIBERO env processor (LiberoProcessorStep).
+    agent = obs["agentview_rgb"][()][:, ::-1, ::-1]
+    wrist = obs["eye_in_hand_rgb"][()][:, ::-1, ::-1]
     state = np.concatenate(
         [obs["ee_pos"][()], obs["ee_ori"][()], obs["gripper_states"][()]],
         axis=-1,

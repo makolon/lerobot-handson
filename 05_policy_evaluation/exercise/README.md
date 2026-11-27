@@ -3,8 +3,9 @@
 Work through these in order. Try each one yourself first, then open the Answers to check.
 Everything uses only the commands from the `05_policy_evaluation` block.
 
-**Setup:** the repo is cloned and `config.env` is sourced. Your group is `gw13`. The login
-node has internet; the compute node does not.
+**Setup:** the repo is cloned and `config.env` is sourced. Your group is `gw13`. Both the
+login and compute nodes have internet. The shared `$HF_HOME` is read-only for you, so
+download into your own cache: `export HF_HOME=$USER_HF_HOME` (= `$USER_DIR/hf_home`).
 
 > ⚠️ **Not every Hub checkpoint runs in this image.** The shared image installs
 > `lerobot[aloha,libero]` only. So:
@@ -20,9 +21,9 @@ node has internet; the compute node does not.
 >
 > | File | Role |
 > |------|------|
-> | [`download_pretrained.sh`](./download_pretrained.sh) | **login node**: download the checkpoint into `$HF_HOME` (Q1) |
+> | [`download_pretrained.sh`](./download_pretrained.sh) | **login node**: download the checkpoint into `$USER_HF_HOME` (Q1) |
 > | [`eval_pretrained.sh`](./eval_pretrained.sh) | run `lerobot-eval` on the checkpoint in its env (Q2); supports `DRY_RUN=1` |
-> | [`eval_pretrained.pbs`](./eval_pretrained.pbs) | batch wrapper (offline binds handled for you) |
+> | [`eval_pretrained.pbs`](./eval_pretrained.pbs) | batch wrapper (binds and `HF_HOME` handled for you) |
 
 ## Questions
 
@@ -36,7 +37,8 @@ Then work out which simulation environment it supports.
    not a dataset).
 2. Read its model card to find the environment it was trained for. The name is the
    clue:  *_pusht -> pusht,  aloha_sim_* -> aloha,  *_libero_* -> libero.
-3. The compute node has no internet, so download it on the LOGIN node, into $HF_HOME.
+3. Pre-download it on the LOGIN node into your own cache, $USER_HF_HOME
+   (the shared $HF_HOME is read-only).
 ```
 
 ### Q2. Evaluate it
@@ -56,16 +58,18 @@ aloha env, because the observation and action spaces differ.
 
 ## Answers
 
-### A1. Download (login node, has internet)
+### A1. Download (login node)
 
 Pick a checkpoint whose policy + env are both supported by the image. A safe default is
 `lerobot/act_aloha_sim_transfer_cube_human` (ACT on ALOHA sim):
 
 ```bash
 cd /work/gw13/$USER/lerobot-handson && source config.env
+export HF_HOME=$USER_HF_HOME                            # your own writable cache
 export CKPT=lerobot/act_aloha_sim_transfer_cube_human   # the one you picked
+module load apptainer/1.3.5
 
-apptainer exec $APPTAINER_IMAGE hf download $CKPT
+apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE hf download $CKPT
 ```
 
 Or run the script (same `--home`/no-xet hardening as the other download scripts):
@@ -86,13 +90,15 @@ clue — `aloha_sim_*` → aloha, `*_libero_*` → libero, `*_pusht` → pusht.
 qsub -I -q $QUEUE_NAME_INTERACTIVE -W group_list=gw13 -l select=1 -l walltime=01:00:00
 module load apptainer/1.3.5
 cd /work/gw13/$USER/lerobot-handson && source config.env
-apptainer shell --nv $APPTAINER_IMAGE      # now inside the container, on the GPU
+apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE   # now inside the container, on the GPU
 ```
 
 ```bash
 # inside the container, on the GPU
-export HF_HUB_OFFLINE=1        # use the checkpoint you downloaded on the login node
+export HF_HOME=$USER_HF_HOME   # the cache you downloaded into in A1
+export HF_HUB_OFFLINE=1        # load the checkpoint from that cache only
 export MUJOCO_GL=egl           # headless rendering for the simulator
+export MUJOCO_EGL_DEVICE_ID=0  # Miyabi: pin the EGL device (CUDA_VISIBLE_DEVICES is a GPU UUID)
 export CKPT=lerobot/act_aloha_sim_transfer_cube_human
 
 lerobot-eval \
@@ -122,13 +128,13 @@ qstat                                  # Q -> R -> done
 cat eval_pretrained.o<jobid>           # read THIS job by id
 ```
 
-You are done when `lerobot-eval` prints the average success rate (0–1). It also saves a
-**rollout video per episode** (up to 10, recorded by default):
+You are done when `lerobot-eval` prints the overall success rate (`pc_success`, in %). It
+also saves rollout videos (up to 10 per task, recorded by default):
 
 ```
-$OUTPUT_DIR/eval_<checkpoint>/
-  eval_info.json          # per-episode success + the video_paths
-  videos/<task>/eval_episode_*.mp4   # one mp4 per episode — watch a success AND a failure
+$OUTPUT_DIR/eval_act_aloha/            # the script writes to $OUTPUT_DIR/eval/<checkpoint name>/
+  eval_info.json          # per_task / per_group / overall: successes, rewards, video_paths
+  videos/<task_group>_<task_id>/eval_episode_*.mp4   # watch a success AND a failure
 ```
 
 ### Notes
@@ -145,6 +151,7 @@ $OUTPUT_DIR/eval_<checkpoint>/
   ENV_TYPE=libero ENV_TASK=libero_object \
     bash 05_policy_evaluation/exercise/eval_pretrained.sh
   ```
+  LIBERO runs every task in the suite (10 for `libero_object`), `EVAL_EPISODES` each.
 - `--eval.batch_size` must be ≤ `--eval.n_episodes` (lerobot raises otherwise); the script
   defaults the batch size to the episode count.
 - If the env fails to load, the container is missing that env extra — see the ⚠️ box above

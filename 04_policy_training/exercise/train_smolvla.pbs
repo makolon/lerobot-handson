@@ -2,14 +2,15 @@
 # =============================================================================
 # train_smolvla.pbs  —  ANSWER to Exercise Q2 (batch variant)
 # -----------------------------------------------------------------------------
-# Fine-tune SmolVLA on an ALOHA Sim dataset on a GH200 node, offline.
+# Train SmolVLA (pretrained SmolVLM2 backbone + new action expert) on an ALOHA Sim
+# dataset on a GH200 node.
 #
 # The exercise text drives this interactively (qsub -I + apptainer shell); this
 # PBS wrapper is the batch equivalent, matching the rest of 04_policy_training so
 # you can submit-and-walk-away. Either path runs the SAME train_smolvla.sh body.
 #
-# Prereq: exercise/download_aloha_sim.sh has cached the dataset + lerobot/smolvla_base
-#         into $HF_HOME on the login node (compute nodes are offline).
+# Prereq: exercise/download_aloha_sim.sh has cached the dataset + the SmolVLM2 backbone
+#         into $USER_HF_HOME on the login node.
 #
 # Submit from the repo root (resources passed at submit time, like train.pbs):
 #   source config.env
@@ -38,7 +39,8 @@ fi
 # --- fail-fast: required variables ---
 : "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
-: "${HF_HOME:?HF_HOME unset}"
+# The dataset + backbone live in YOUR cache (download_aloha_sim.sh); the shared one is read-only.
+HF_HOME="${USER_HF_HOME:-${USER_DIR:?USER_DIR unset (config.env)}/hf_home}"
 
 # W&B logs LIVE (compute nodes have internet); train.sh falls back to offline if
 # WANDB_API_KEY is empty.
@@ -67,8 +69,8 @@ fi
 
 # --- run train_smolvla.sh inside the container ---
 # --nv     : pass the GPU through
-# --bind   : the HF cache (dataset + smolvla_base) and outputs must be visible.
-#            The dataset and base model are resolved by repo_id from HF_HOME.
+# --bind   : the HF cache (dataset + SmolVLM2 backbone) and outputs must be visible.
+#            The dataset and the backbone are resolved by repo_id from HF_HOME.
 apptainer exec --nv \
   --home "${OUTPUT_DIR}" \
   --bind "${OUTPUT_DIR}:${OUTPUT_DIR}" \

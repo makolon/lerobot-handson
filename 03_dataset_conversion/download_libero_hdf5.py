@@ -2,8 +2,8 @@
 # =============================================================================
 # 03_dataset_conversion/download_libero_hdf5.py
 #   Download ONE raw LIBERO task .hdf5 (robomimic/robosuite format) into the
-#   shared area. Run on the Miyabi [login node] — it has internet. Compute nodes
-#   are offline, so we stage the file once here and everyone reads it offline.
+#   shared area. Run once on the Miyabi [login node], as the organizer, and
+#   everyone reads the same staged file (the shared area is read-only for them).
 #
 #   Source: yifengzhu-hf/LIBERO-datasets (the official raw LIBERO hdf5 demos).
 #   The full repo is ~100 GB, so we fetch a SINGLE task file, not the whole thing.
