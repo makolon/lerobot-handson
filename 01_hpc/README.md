@@ -33,7 +33,7 @@ Everything in this lecture runs on **Miyabi-G** (the GH200 GPU nodes); Miyabi-C 
    ┌────────┴──────────┐  mount   │  compute nodes (Miyabi-G)    │
    │  shared storage   │◀────────▶│  1,120 × NVIDIA GH200        │
    │  /work/gw13/$USER │          │  Grace-Hopper · aarch64      │
-   └───────────────────┘          │  (offline: no internet)      │
+   └───────────────────┘          │  (also has internet)         │
                                   └──────────────────────────────┘
 ```
 
@@ -42,12 +42,12 @@ Everything in this lecture runs on **Miyabi-G** (the GH200 GPU nodes); Miyabi-C 
 The login node is shared by everyone — never run heavy compute there. Real work happens on a compute node, which you get through the scheduler.
 
 ```
- LOGIN NODE (shared, has internet)        COMPUTE NODE (yours, offline)
- ─────────────────────────────────        ─────────────────────────────
+ LOGIN NODE (shared, has internet)        COMPUTE NODE (yours, also online)
+ ─────────────────────────────────        ─────────────────────────────────
  - edit code, git clone                    • run training / heavy compute
  - build the Apptainer image      ───────▶ • use the GPU (nvidia-smi)
  - pre-download HF datasets                • read them from shared storage
- - submit jobs (qsub)                      • NO internet here
+ - submit jobs (qsub)                      • internet OK (but no live installs)
  ✗ never run heavy compute here
 
  Two ways to get a compute node:
@@ -55,7 +55,7 @@ The login node is shared by everyone — never run heavy compute there. Real wor
    batch         qsub job.pbs   → queued, runs later      (long training)
 ```
 
-Because the compute nodes are offline, datasets and checkpoints are **pre-downloaded** to shared storage on the login node, and jobs read them with `HF_HUB_OFFLINE=1` (see `env/predownload_hf.sh`).
+The compute nodes have internet too, but the big shared assets (the LIBERO dataset in `$LIBERO_ROOT`, the ResNet backbone, the image) are **pre-staged once** in the shared area, so every job reads the same files quickly. The shared area is read-only for you; anything you download yourself goes to `$USER_HF_HOME`. Only `$PWD` and `$HOME` are mounted into the container automatically, so commands that touch the share pass `--bind "$SHARED_DIR"`.
 
 ### Editing your code on Miyabi
 
@@ -110,7 +110,7 @@ Why we must use containers on HPC:
 
 - **You are not root.** On a shared cluster, you can't run `apt-get install` to add system libraries. The container already has them inside.
 - **Always the same.** The same image gives you the same setup on every node, every time. Nothing changes from one run to the next.
-- **No internet on compute nodes.** Compute nodes can't reach the internet, so you can't run `pip install` there. You install everything once, on the login node (which has internet), and bake it into the image.
+- **No live installs at run time.** The nodes can reach the internet, but you still don't `pip install` inside a job — that would make each run depend on the network and on whatever versions resolve that day. You build everything into the image once, so every node runs the exact same, pinned environment.
 
 ### Docker vs. Apptainer
 
@@ -170,11 +170,18 @@ A PBS script has two parts: **directives** (`#PBS ...`, read by the scheduler) a
 
 ```bash
 #!/bin/bash
-#PBS -q <queue>             # which queue (this sets your GPU slot)
-#PBS -W group_list=gw13     # which project to charge (yours is gw13)
-#PBS -l select=1            # reserve 1 node = 1 GH200 (its GPU is auto-allocated)
-#PBS -l walltime=00:15:00   # max run time; the job is killed when time is up
-#PBS -N warmup              # job name (also used to name the output files)
+# NOTE: Miyabi's qsub rejects a comment on the same line as a #PBS directive,
+#       so each comment sits on its own line above the directive.
+# which queue (this sets your GPU slot)
+#PBS -q <queue>
+# which project to charge (yours is gw13)
+#PBS -W group_list=gw13
+# reserve 1 node = 1 GH200 (its GPU is auto-allocated)
+#PBS -l select=1
+# max run time; the job is killed when time is up
+#PBS -l walltime=00:15:00
+# job name (also used to name the output files)
+#PBS -N warmup
 
 cd "$PBS_O_WORKDIR"
 module load apptainer/1.3.5
@@ -221,7 +228,7 @@ Read it with ordinary shell commands — for the warm-up job with id `12345`:
 
 ```bash
 ls warmup.*               # warmup.o12345   (just one file: -j oe merged the streams)
-cat warmup.o12345         # everything the job printed (nvidia-smi + the torch check)
+cat warmup.o12345         # everything the job printed (host name + nvidia-smi)
 tail -n 20 warmup.o12345  # just the last 20 lines
 ```
 
@@ -326,8 +333,7 @@ The container image is **shared**: the organizer built it once into the shared a
 you don't build a 15 GB image yourself — `source config.env` points `$APPTAINER_IMAGE` at
 it (and creates your personal output area under the share). Curious how it's made?
 `env/build_image.sh` bootstraps an NGC PyTorch base (aarch64) and installs LeRobot from
-`env/apptainer.def`; it must run on the **login node** because the build needs internet
-(compute nodes are offline).
+`env/apptainer.def`; the organizer ran it once on the **login node**.
 
 Step 6 — now do it the batch way (the real workflow). Submit the tiny warm-up job, watch it, read its log:
 
@@ -337,10 +343,10 @@ Step 6 — now do it the batch way (the real workflow). Submit the tiny warm-up 
 # The parametrized "pass -q/-W/-l at submit time" pattern is taught later in train.pbs.
 qsub 01_hpc/warmup.pbs          # prints a job id, e.g. 12345.opbs
 qstat                  # watch Q -> R -> (disappears when done)
-cat warmup.o*                   # read the merged output log (nvidia-smi + torch check)
+cat warmup.o*                   # read the merged output log (host name + nvidia-smi)
 ```
 
-If `cuda available` is `True` and the log shows the GPU, your environment is ready. If anything failed, paste the error into the shared channel now — this is the moment to catch it. Don't get stuck; just ask.
+If the log shows your host name and `nvidia-smi` lists the GH200, your environment is ready. If anything failed, paste the error into the shared channel now — this is the moment to catch it. Don't get stuck; just ask.
 
 ## Exercise — Warm up on HPC + Containers (~5 min)
 
@@ -405,7 +411,7 @@ qdel <id> to free the slot for others.
 
 ### Answers
 
-**A1: (b).** The login node is shared. It's for light prep — editing, cloning, **building or pulling the image** (only the login node has internet), pre-downloading data — and for submitting jobs with `qsub`. Anything heavy or GPU-bound (a, c, d) must run on a compute node through a job.
+**A1: (b).** The login node is shared. It's for light prep — editing, cloning, **building or pulling the image**, pre-downloading data — and for submitting jobs with `qsub`. Anything heavy or GPU-bound (a, c, d) must run on a compute node through a job.
 
 **A2: (b).** Docker's `dockerd` runs as root, so giving every user access to it is close to giving them root on a shared machine. Apptainer runs as *you*, with no daemon and no root, and its image is a single `.sif` file. (You can still convert Docker / NGC images with `apptainer build` / `apptainer pull docker://...`.)
 
@@ -414,16 +420,24 @@ qdel <id> to free the slot for others.
 - (c) has no `-I`, so PBS treats it as a batch submission and expects a script — it does not open an interactive session.
 - (b) has both: `-I` for interactive, and `-W group_list=gw13` for the correct project flag.
 
-**A4:** a minimal version (the shipped `01_hpc/warmup.pbs` is the same, and also adds a `torch.cuda.is_available()` check inside the container):
+**A4:** a minimal version (the shipped `01_hpc/warmup.pbs` is the same, minus the comments):
 
 ```bash
 #!/bin/bash
-#PBS -N warmup              # job name
-#PBS -q debug-g             # quick full-node GPU queue (walltime <= 00:30:00)
-#PBS -W group_list=gw13     # your project (NOT -P)
-#PBS -l select=1            # one GH200 node (GPU auto-allocated; no :ngpus=)
-#PBS -l walltime=00:10:00   # ten minutes is plenty
-#PBS -j oe                  # merge stdout+stderr into one warmup.o<id>
+# NOTE: Miyabi's qsub rejects a comment on the same line as a #PBS directive,
+#       so each comment sits on its own line above the directive.
+# job name
+#PBS -N warmup
+# quick full-node GPU queue (walltime <= 00:30:00)
+#PBS -q debug-g
+# your project (NOT -P)
+#PBS -W group_list=gw13
+# one GH200 node (GPU auto-allocated; no :ngpus=)
+#PBS -l select=1
+# ten minutes is plenty
+#PBS -l walltime=00:10:00
+# merge stdout+stderr into one warmup.o<id>
+#PBS -j oe
 
 cd "$PBS_O_WORKDIR"
 source config.env           # for $APPTAINER_IMAGE / $APPTAINER_MODULE

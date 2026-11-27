@@ -82,7 +82,8 @@ Raw layout (robomimic/robosuite format):
   task (language) -> from the file name, or data.attrs["problem_info"]
 
 Two quirks to handle:
-  - robosuite/LIBERO renders images upside-down -> flip vertically (img[::-1]).
+  - robosuite/LIBERO renders images upside-down -> rotate 180° (img[::-1, ::-1]),
+    the convention of HuggingFaceVLA/libero and of LeRobot's LIBERO env processor.
   - there is no clean fps attribute; LIBERO control runs at 20 Hz -> fps = 20.
 ```
 
@@ -110,7 +111,7 @@ source config.env
 export HF_HOME="${USER_DIR}/hf_home" && mkdir -p "$HF_HOME"   # writable cache for the reload
 
 # 1) inspect first (key names/shapes can vary slightly by LIBERO version)
-apptainer exec --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE python - <<'PY'
+apptainer exec --bind "$SHARED_DIR" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE python - <<'PY'
 import os, h5py
 f = h5py.File(os.environ["LIBERO_TASK_HDF5"], "r")
 data = f["data"]
@@ -120,12 +121,12 @@ d0.visititems(lambda n, o: print(" ", n, getattr(o, "shape", ""), getattr(o, "dt
 PY
 
 # 2) convert (your own script, or the reference answer in this dir)
-apptainer exec --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE \
+apptainer exec --bind "$SHARED_DIR" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE \
   python 03_dataset_conversion/exercise/convert_libero_hdf5.py \
     --hdf5 "$LIBERO_TASK_HDF5" --root .out/libero
 
 # 3) test — must print OK
-apptainer exec --bind "$HF_HOME:$HF_HOME" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE \
+apptainer exec --bind "$SHARED_DIR" --env "HF_HOME=$HF_HOME" $APPTAINER_IMAGE \
   python 03_dataset_conversion/exercise/test_conversion.py \
     --root .out/libero --hdf5 "$LIBERO_TASK_HDF5"
 ```

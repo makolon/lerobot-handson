@@ -5,8 +5,8 @@ The concept questions come straight from the Section 2 chapter; the hands-on use
 `Try it` commands you already saw.
 
 **Setup:** the repo is cloned, `config.env` is sourced, and the shared image is at
-`$APPTAINER_IMAGE`. Everything here runs on the login node, inside the container — no GPU,
-no job needed.
+`$APPTAINER_IMAGE`. Everything here is light: run it inside the container, on the login
+node or in an interactive session — no GPU, no batch job needed.
 
 > The hands-on (Q5) is also captured as a runnable script, and the interactive,
 > plot-everything version lives in the notebook:
@@ -72,7 +72,7 @@ fast as possible today. Which one, and why?
 
 ```
 Open the dataset we will train on and read its structure off the real object.
-On the login node, inside the container (no GPU):
+Inside the container (login node or interactive session; no GPU):
 
 1. Print the dataset's fps, its number of episodes, and the shape of every feature.
 2. From that output, answer:
@@ -114,14 +114,16 @@ base form, and this task needs none.
 
 ### A5. Read it off the object
 
-Run the answer script (reads `$DATA_REPO` from the pre-downloaded cache):
+Run the answer script (reads `$DATA_REPO` from its pre-staged local copy, `$LIBERO_ROOT`;
+only `$PWD`/`$HOME` are mounted automatically, so bind the share):
 
 ```bash
 source config.env
-apptainer exec $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py
+apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE python 02_imitation_learning/exercise/read_dataset.py
 
-# list the pre-downloaded repos
+# list the pre-downloaded repos (Hub-cache layout) and the staged LIBERO folder
 ls $HF_HOME/hub
+ls $LIBERO_ROOT
 ```
 
 How to read it:
@@ -135,7 +137,8 @@ How to read it:
   the same `observation` / `action` format is the contract the **ENVIRONMENT** (simulator
   or robot) must match at eval time.
 - **Hub two faces** (`ls $HF_HOME/hub`): a `datasets--…` entry is a `LeRobotDataset` used
-  to **TRAIN** (e.g. `datasets--HuggingFaceVLA--libero`); a `models--…` entry holds trained
+  to **TRAIN** (the LIBERO dataset itself is staged as a plain folder in `$LIBERO_ROOT`,
+with `meta/ data/ videos/`); a `models--…` entry holds trained
   policy weights used to **EVALUATE** / fine-tune (the policy name in the repo id is the
   giveaway).
 

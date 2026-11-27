@@ -68,7 +68,8 @@ fi
 # Optional dtype (e.g. bfloat16 to fit a VLA fine-tune in memory).
 [[ -n "${POLICY_DTYPE:-}" ]] && ARGS+=( --policy.dtype="${POLICY_DTYPE}" )
 
-# Local dataset (offline / synthetic). On Miyabi the dataset is resolved from HF_HOME.
+# Local dataset root: $LIBERO_ROOT on Miyabi (train_libero.sh sets it) or a synthetic dir.
+# Without a root, LeRobot looks in its own cache ($HF_HOME/lerobot/) and downloads there.
 [[ -n "${DATASET_ROOT:-}" ]] && ARGS+=( --dataset.root="${DATASET_ROOT}" )
 
 # Optional policy knobs (only added when set)

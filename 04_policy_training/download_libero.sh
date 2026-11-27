@@ -2,17 +2,20 @@
 # =============================================================================
 # download_libero.sh  —  fetch the LeRobot LIBERO dataset into the SHARED dir
 # -----------------------------------------------------------------------------
-# Run on the Miyabi [LOGIN NODE] (it has internet; compute nodes are offline).
+# Run ONCE on the Miyabi [LOGIN NODE], as the organizer. Compute nodes have internet
+# too, but staging the ~33 GB dataset once in the share spares every participant the
+# download (and the shared area is read-only for them).
 #
 # What it does (everything lands in the shared area so the whole class reuses it):
 #   1. downloads HuggingFaceVLA/libero (a LeRobotDataset combining the LIBERO
 #      suites: spatial / object / goal / 10) into  $LIBERO_ROOT
 #   2. warm-loads it once with lerobot so any dataset-version conversion happens
-#      now, online — not later on the offline compute node
-#   3. pre-caches the ACT ResNet18 ImageNet backbone into $TORCH_HOME, so offline
-#      training doesn't try to download it on the compute node
+#      now, once — not later inside every participant's job
+#   3. pre-caches the ACT ResNet18 ImageNet backbone into $TORCH_HOME, so training
+#      jobs read it from the share instead of each downloading it
 #
-# After this, train offline from the share with 04_policy_training/train_libero.{sh,pbs}.
+# After this, train from the share with 04_policy_training/train_libero.{sh,pbs}
+# (always pass --dataset.root=$LIBERO_ROOT).
 #
 # Override any of these before running (defaults target /work/gw13/share/handson):
 #   SHARE_DIR     shared root            (default /work/gw13/share/handson)
@@ -93,13 +96,13 @@ ds = LeRobotDataset(repo_id, root=root)
 print(f"[libero] loaded OK: {ds.num_episodes} episodes, {ds.num_frames} frames")
 PY
 then
-  echo "WARN: warm-load failed. The files are downloaded, but if offline training" >&2
-  echo "      hits a dataset-version error, re-run this step online." >&2
+  echo "WARN: warm-load failed. The files are downloaded, but if training hits a" >&2
+  echo "      dataset-version error, re-run this step." >&2
 fi
 
 # --- 3. pre-cache the ACT ResNet18 ImageNet backbone -------------------------
 # ACT's vision backbone defaults to torchvision ResNet18 IMAGENET1K_V1, fetched
-# via torch.hub into TORCH_HOME. Cache it now so the offline compute node finds it.
+# via torch.hub into TORCH_HOME. Cache it now in the share so every job finds it.
 # (Alternatively train with PRETRAINED_BACKBONE_WEIGHTS=null for random init.)
 echo "== [3/3] pre-caching ACT ResNet18 ImageNet backbone =="
 "${APPTAINER_RUN[@]}" python - <<'PY'

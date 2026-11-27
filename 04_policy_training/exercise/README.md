@@ -4,14 +4,16 @@ Work through these in order. Try each one yourself first, then open the Answers 
 check. Everything uses only the commands from the `04_policy_training` block.
 
 **Setup:** you have the repo cloned and `config.env` sourced. Your group is `gw13`.
-The login node has internet; the compute node does not.
+Both the login and compute nodes have internet. The shared `$HF_HOME` is read-only for
+you, so download into your own cache, `$USER_HF_HOME` (= `$USER_DIR/hf_home`):
+`export HF_HOME=$USER_HF_HOME` in every shell you use, after `source config.env`.
 
 > The answer commands are also captured as runnable scripts in this directory, so you
 > can either type the commands yourself or run the scripts:
 >
 > | File | Role |
 > |------|------|
-> | [`download_aloha_sim.sh`](./download_aloha_sim.sh) | **login node**: download the ALOHA Sim dataset + `lerobot/smolvla_base` into `$HF_HOME`, warm-load the dataset (Q1) |
+> | [`download_aloha_sim.sh`](./download_aloha_sim.sh) | **login node**: fetch the ALOHA Sim dataset (by loading it once) + the SmolVLM2 backbone into `$USER_HF_HOME` (Q1) |
 > | [`train_smolvla.sh`](./train_smolvla.sh) | SmolVLA config layer over [`../train.sh`](../train.sh) — sets `--policy.type=smolvla` + `load_vlm_weights`, puts num2words on `PYTHONPATH`, small batch (Q2) |
 > | [`train_smolvla.pbs`](./train_smolvla.pbs) | batch PBS wrapper (the interactive answer's submit-and-walk-away equivalent) |
 >
@@ -29,8 +31,10 @@ Browse the LeRobot datasets on the Hub and download an ALOHA Sim dataset yoursel
 
 1. Open https://huggingface.co/lerobot and find a dataset whose name starts with
    aloha_sim_  (e.g. insertion or transfer_cube, human or scripted).
-2. The compute node has no internet, so download it on the LOGIN node, into $HF_HOME.
-3. Also download the SmolVLA base model lerobot/smolvla_base — you fine-tune from it.
+2. Pre-download it on the LOGIN node into your own cache, $USER_HF_HOME
+   (the shared $HF_HOME is read-only).
+3. Also download SmolVLA's pretrained vision-language backbone,
+   HuggingFaceTB/SmolVLM2-500M-Video-Instruct — SmolVLA starts from it.
 ```
 
 ### Q2. Train SmolVLA
@@ -39,8 +43,8 @@ Browse the LeRobot datasets on the Hub and download an ALOHA Sim dataset yoursel
 Fine-tune SmolVLA on the dataset you just downloaded, and confirm it trains.
 
 1. Get an interactive GPU and enter the container.
-2. Run a short lerobot-train job (a few hundred steps) that fine-tunes
-   lerobot/smolvla_base on your dataset.
+2. Run a short lerobot-train job (a few hundred steps) that trains SmolVLA on your
+   dataset, starting from the pretrained SmolVLM2 backbone.
 3. Confirm that train/loss drops and a checkpoint is written.
 
 You are checking that SmolVLA trains end-to-end, not training a strong policy.
@@ -51,22 +55,27 @@ enough — you do not need the loss to converge.
 
 ## Answers
 
-### A1. Download (login node, has internet)
+### A1. Download (login node)
 
 Pick any `aloha_sim_*` dataset — here `lerobot/aloha_sim_insertion_human` (50 episodes,
 bimanual ALOHA, top camera). Download on the login node:
 
 ```bash
 cd /work/gw13/$USER/lerobot-handson && source config.env
+export HF_HOME=$USER_HF_HOME                         # your own writable cache
 export DATASET=lerobot/aloha_sim_insertion_human     # the one you picked
+module load apptainer/1.3.5
 
-# dataset + SmolVLA base model -> cached under $HF_HOME
-apptainer exec $APPTAINER_IMAGE huggingface-cli download --repo-type dataset $DATASET
-apptainer exec $APPTAINER_IMAGE huggingface-cli download lerobot/smolvla_base
+# dataset: load it once with LeRobot, so it lands in LeRobot's cache ($HF_HOME/lerobot/)
+apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE python -c \
+  "import sys; from lerobot.datasets.lerobot_dataset import LeRobotDataset as D; print(D(sys.argv[1]).num_episodes, 'episodes')" $DATASET
+
+# SmolVLA's pretrained VLM backbone (weights + processor) -> $HF_HOME/hub
+apptainer exec --bind "$SHARED_DIR" $APPTAINER_IMAGE hf download HuggingFaceTB/SmolVLM2-500M-Video-Instruct
 ```
 
-Or run the script (also warm-loads the dataset, and uses the same `--home`/no-xet
-hardening as `download_libero.sh` to avoid filling the small `/home` quota):
+Or run the script (same two steps, with the same `--home`/no-xet hardening as
+`download_libero.sh` to avoid filling the small `/home` quota):
 
 ```bash
 source config.env
@@ -74,7 +83,7 @@ SMOLVLA_DATASET=lerobot/aloha_sim_insertion_human \
   bash 04_policy_training/exercise/download_aloha_sim.sh
 ```
 
-### A2. Fine-tune SmolVLA
+### A2. Train SmolVLA
 
 **Interactive** — get a GPU, enter the container **with the writable bind**, and train:
 
@@ -87,7 +96,9 @@ apptainer shell --nv --bind "$SHARED_DIR" $APPTAINER_IMAGE   # bind => outputs/c
 
 ```bash
 # inside the container, on the GPU. PYTHONPATH adds num2words (staged in the share).
-# Do NOT set HF_HUB_OFFLINE — compute nodes have internet.
+# Do NOT set HF_HUB_OFFLINE — compute nodes have internet, and LeRobot checks the
+# dataset version on the Hub when a dataset is loaded by repo_id.
+export HF_HOME=$USER_HF_HOME    # the cache you filled in A1
 export DATASET=lerobot/aloha_sim_insertion_human
 
 PYTHONPATH=$SHARED_DIR/pylibs lerobot-train \
@@ -108,7 +119,7 @@ the same arguments via `../train.sh`):
 SMOLVLA_DATASET=$DATASET bash 04_policy_training/exercise/train_smolvla.sh
 ```
 
-**Batch** — submit-and-walk-away (same body, offline binds handled for you):
+**Batch** — submit-and-walk-away (same body, binds and `HF_HOME` handled for you):
 
 ```bash
 source config.env
@@ -138,5 +149,8 @@ $OUTPUT_DIR/smolvla_aloha/checkpoints/last/pretrained_model/
   `lerobot[aloha,libero,smolvla]` would bake it in and drop the `PYTHONPATH`.
 - Do **not** pass `--policy.dtype` for SmolVLA — its config has no `dtype` field (draccus rejects
   it). fp32 fits fine on a GH200's 96 GB for this exercise.
+- **Why load the dataset with `LeRobotDataset` in A1** instead of `hf download --repo-type dataset`:
+  LeRobot 0.5.1 reads datasets from its own cache (`$HF_HOME/lerobot/`), not from the generic
+  Hub cache (`$HF_HOME/hub`) that `hf download` fills.
 - Unlike ACT, SmolVLA reads the `task` instruction — the dataset's language field is used.
 - SmolVLA is larger than ACT; keep `--batch_size` small (4).

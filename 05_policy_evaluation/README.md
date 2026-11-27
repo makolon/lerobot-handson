@@ -2,16 +2,17 @@
 
 ## Goal
 
-Evaluate a **distributed checkpoint** in the LIBERO simulation and produce a success
-rate. The design lets you see "numbers of a robot doing the task" even if your own
-training doesn't finish in time (it does not depend on training completion).
+Evaluate a checkpoint in the LIBERO simulation and produce a success rate — normally
+**your own Section 4 checkpoint** (`POLICY_PATH`), or a distributed checkpoint
+(`CKPT_REPO`) if the organizer staged one, so you still get numbers when your own
+training did not finish.
 
 ## Prerequisites
 
 - `config.env` has been `source`d (sets `CKPT_REPO`, `APPTAINER_IMAGE`, `HF_HOME`, `OUTPUT_DIR`).
-- The distributed checkpoint (`CKPT_REPO`) is already in the shared `HF_HOME`, staged by
-  the organizer (see [`MAINTAINER.md`](../MAINTAINER.md) §3). Eval output goes to your
-  personal `OUTPUT_DIR`.
+- `CKPT_REPO` is empty by default. If the organizer set it and staged it with
+  `env/predownload_hf.sh` (see [`MAINTAINER.md`](../MAINTAINER.md) §3), `eval.sh` evaluates it
+  when no `POLICY_PATH` is given. Eval output goes to your personal `OUTPUT_DIR`.
 - The container has the LIBERO eval dependencies (the `lerobot[libero]` extra in `env/apptainer.def`).
 
 ## Layout
@@ -19,18 +20,22 @@ training doesn't finish in time (it does not depend on training completion).
 | File | Role |
 |------|------|
 | [`eval.pbs`](./eval.pbs) | `#PBS` resource spec + calls `eval.sh` via `apptainer exec --nv` |
-| [`eval.sh`](./eval.sh) | evaluates the distributed checkpoint in LIBERO via `lerobot-eval` |
+| [`eval.sh`](./eval.sh) | evaluates `POLICY_PATH` (or `CKPT_REPO`) in LIBERO via `lerobot-eval` |
 
 ## Run
 
 ```bash
 source config.env
-qsub 05_policy_evaluation/eval.pbs
+# your own checkpoint (forward POLICY_PATH with -v; Miyabi rejects -V)
+POLICY_PATH=$OUTPUT_DIR/act_base/checkpoints/last/pretrained_model \
+qsub -q "$QUEUE_NAME" -W group_list="$GROUP" -l select=1 -l walltime="$WALLTIME" \
+     -v POLICY_PATH 05_policy_evaluation/eval.pbs
 qstat
 ```
 
-To evaluate a checkpoint you trained yourself, pass the `pretrained_model` path under
-`OUTPUT_DIR` instead of `config.env`'s `CKPT_REPO` to `eval.sh` (see the in-script comment).
+Interactively (inside `apptainer shell --nv --bind "$SHARED_DIR" ...`):
+`bash 05_policy_evaluation/eval.sh --policy.path=$OUTPUT_DIR/act_base/checkpoints/last/pretrained_model`.
+Results go to `$OUTPUT_DIR/eval/<run name>` (here `$OUTPUT_DIR/eval/act_base`).
 
 ## Verify the command without LIBERO
 
@@ -44,7 +49,7 @@ DRY_RUN=1 POLICY_PATH=.smoke/outputs/smoke_train/checkpoints/last/pretrained_mod
 ```text
 [eval] lerobot-eval --policy.path=.../pretrained_model --env.type=libero \
        --env.task=libero_object --eval.n_episodes=10 --eval.batch_size=10 \
-       --output_dir=.smoke/outputs/eval_pretrained_model --policy.device=cpu
+       --output_dir=.smoke/outputs/eval/smoke_train --policy.device=cpu
 [eval] DRY_RUN=1 -> command construction verified, not executing.
 ```
 
@@ -53,10 +58,13 @@ defaults the batch size to the episode count.
 
 ## Expected output (self-check cues, real run)
 
-- The log shows per-episode success/failure and a final **success rate** (e.g. `0.6`).
-- A rollout **video per episode** (up to 10) is written under `$OUTPUT_DIR/eval_*/videos/<task>/eval_episode_*.mp4`
-  — `lerobot-eval` always records these; `eval_info.json` lists every `video_path`.
-- Eval metrics are recorded in the shared W&B (same project as the training run).
+- LIBERO runs **every task in the suite** (10 for `libero_object`), each for
+  `EVAL_EPISODES` episodes, then prints `Overall Aggregated Metrics` with `pc_success`
+  (a percentage, e.g. `60.0`) and `n_episodes` (e.g. 100).
+- Rollout videos (up to 10 per task) are written under
+  `$OUTPUT_DIR/eval/<run>/videos/<suite>_<task_id>/eval_episode_*.mp4` — `lerobot-eval` always
+  records these. `eval_info.json` holds `per_task` / `per_group` / `overall` results.
+- `lerobot-eval` does not log to W&B; read the numbers from the log or `eval_info.json`.
 
 If something goes wrong:
 

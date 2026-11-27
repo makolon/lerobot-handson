@@ -2,12 +2,12 @@
 # =============================================================================
 # eval_pretrained.pbs  —  ANSWER to Exercise Q2 (batch variant)
 # -----------------------------------------------------------------------------
-# Evaluate a pretrained checkpoint in its simulator on a GH200 node, offline.
+# Evaluate a pretrained checkpoint in its simulator on a GH200 node.
 # The exercise text drives this interactively (qsub -I + apptainer shell); this
 # PBS wrapper is the submit-and-walk-away equivalent, matching ../eval.pbs. Both
 # run the SAME eval_pretrained.sh body.
 #
-# Prereq: download_pretrained.sh cached $CKPT into $HF_HOME on the login node.
+# Prereq: download_pretrained.sh cached $CKPT into $USER_HF_HOME on the login node.
 #
 # Submit from the repo root (resources passed at submit time, like eval.pbs):
 #   source config.env
@@ -34,7 +34,8 @@ fi
 # --- fail-fast ---
 : "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset (config.env)}"
 : "${OUTPUT_DIR:?OUTPUT_DIR unset}"
-: "${HF_HOME:?HF_HOME unset}"
+# The checkpoint lives in YOUR cache (download_pretrained.sh); the shared one is read-only.
+HF_HOME="${USER_HF_HOME:-${USER_DIR:?USER_DIR unset (config.env)}/hf_home}"
 
 # Checkpoint + env (override via -v at submit time, or edit here).
 : "${CKPT:=lerobot/act_aloha_sim_transfer_cube_human}"

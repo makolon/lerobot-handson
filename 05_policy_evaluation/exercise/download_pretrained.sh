@@ -2,11 +2,12 @@
 # =============================================================================
 # download_pretrained.sh  —  ANSWER to Exercise Q1 (fetch a pretrained checkpoint)
 # -----------------------------------------------------------------------------
-# Run on the Miyabi [LOGIN NODE] (it has internet; compute nodes are offline).
+# Run on the Miyabi [LOGIN NODE]. (Compute nodes have internet too; downloading once
+# here means the eval job reads a fixed, already-complete copy.)
 #
-# Downloads ONE pretrained policy checkpoint (a MODEL repo) into the shared HF
-# cache ($HF_HOME), so every compute job evaluates the SAME pre-staged files
-# (faster + reproducible than each person re-downloading).
+# Downloads ONE pretrained policy checkpoint (a MODEL repo) into YOUR HF cache,
+# $USER_HF_HOME (= $USER_DIR/hf_home). The shared $HF_HOME is read-only for
+# participants, so participant downloads go to the personal cache.
 #
 # Default: lerobot/act_aloha_sim_transfer_cube_human — an ACT policy on the ALOHA
 # sim env. Chosen because it actually LOADS in this image: it needs no extra
@@ -21,7 +22,7 @@
 #
 # Override before running:
 #   CKPT      model repo_id   (default lerobot/act_aloha_sim_transfer_cube_human)
-#   HF_HOME   HF cache        (from config.env; the bind target)
+#   USER_HF_HOME  your HF cache (from config.env; default $USER_DIR/hf_home)
 # =============================================================================
 set -euo pipefail
 
@@ -36,7 +37,8 @@ fi
 
 : "${APPTAINER_IMAGE:?APPTAINER_IMAGE unset — source config.env and build the image (01_hpc) first}"
 : "${SHARE_DIR:=/work/gw13/share/handson}"
-: "${HF_HOME:=${SHARE_DIR}/hf_home}"
+# Participant downloads go to the personal cache (the shared HF_HOME is read-only).
+HF_HOME="${USER_HF_HOME:-${USER_DIR:?USER_DIR unset (source config.env)}/hf_home}"
 : "${CKPT:=lerobot/act_aloha_sim_transfer_cube_human}"
 
 if [[ ! -f "${APPTAINER_IMAGE}" ]]; then
@@ -68,4 +70,4 @@ apptainer exec \
 
 echo
 echo "[ckpt] done. ${CKPT} is cached under ${HF_HOME}."
-echo "  evaluate it (offline) with:  bash 05_policy_evaluation/exercise/eval_pretrained.sh"
+echo "  evaluate it with:  bash 05_policy_evaluation/exercise/eval_pretrained.sh"

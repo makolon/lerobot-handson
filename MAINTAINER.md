@@ -70,7 +70,8 @@ bash env/build_image.sh
 # 3. Stage the shared LIBERO dataset + ResNet18 backbone (login node has internet).
 bash 04_policy_training/download_libero.sh
 
-# 4. Pre-download the eval checkpoint / generic dataset into the shared HF cache.
+# 4. (Optional) Pre-stage an eval checkpoint (CKPT_REPO) into the shared HF cache.
+#    The dataset is NOT staged here — step 3 already put it in $LIBERO_ROOT.
 bash env/predownload_hf.sh
 ```
 
